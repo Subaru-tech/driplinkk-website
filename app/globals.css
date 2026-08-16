@@ -1,26 +1,722 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ============================================================================
+   DripLink design tokens — UI/UX spec §1.1
+   ----------------------------------------------------------------------------
+   Dark is the DEFAULT. Light is an opt-in toggle (`data-theme="light"` on
+   <html>), never driven by prefers-color-scheme — per spec, light mode is a
+   toggle, not the default.
+
+   These custom properties use the spec's names verbatim so they stay greppable
+   against the handoff doc. They are mapped to Tailwind utility names in the
+   @theme block below.
+   ========================================================================= */
+
+:root,
+[data-theme="dark"] {
+  /* ------------------------------------------------------------------------
+     FOREST + CREAM.
+     Roles, consistent everywhere:
+       ACCENT   (cream)   is the signal — CTAs, focus, the hot nozzle.
+       ACCENT-2 (foliage) is life — eyebrows, links, the tree's canopy.
+       MACHINE / BARK are canvas-only tones for the printer and trunk.
+     Every pair is verified WCAG AA on every surface it actually lands on,
+     and secondary/tertiary text are kept 1.37x apart so the type hierarchy
+     survives — a solver that only chases AA collapses them into one grey.
+     ---------------------------------------------------------------------- */
+  --bg-void: #262b21; /* deepest — hero backdrop, full-bleed floors */
+  --bg-primary: #31372b; /* forest — page */
+  --bg-secondary: #3a4133; /* cards, panels */
+  --bg-tertiary: #3f4737; /* hover states, nested panels */
+  --border: #4b5442; /* decorative dividers — no contrast requirement */
+  --border-strong: #626d56;
+  /* Interactive control boundaries (secondary buttons, inputs, checkboxes).
+     WCAG 1.4.11 wants 3:1 for these and BOTH border tokens above fail it on
+     every surface — 2.65:1 at best. This one clears 3:1 on all four. */
+  --border-control: #869575;
+
+  --text-primary: #faf7ee;
+  --text-secondary: #c7cbb9;
+  --text-tertiary: #a9af97;
+
+  --accent: #faf7ee; /* cream — CTA / focus / signal */
+  --accent-hover: #ece8db;
+  --accent-muted: #3f4737;
+  --accent-contrast: #31372b; /* dark text ON accent: 11.45:1 */
+
+  --accent-2: #a9d26b; /* foliage — growth / links / canopy */
+  --accent-2-muted: #2f3a22;
+
+  /* Canvas-only material tones for the hero scene. */
+  --machine: #97a189; /* printer frame — sage, quieter than the tree */
+  --bark: #c08b52; /* trunk + branches */
+
+  --danger: #ffafa8;
+  --danger-muted: #43302c;
+  --warning: #ffcf6b;
+  --warning-muted: #40381f;
+  --info: #a8cdf2;
+  --info-muted: #2b3540;
+
+  color-scheme: dark;
 }
+
+/* Light mode: bg/text roles invert, accent + status hues are unchanged.
+   Per spec — do not reinvent a second palette. */
+[data-theme="light"] {
+  --bg-void: #e8e5d9;
+  --bg-primary: #faf7ee; /* cream — page */
+  --bg-secondary: #f2eee1;
+  --bg-tertiary: #e6e3d8;
+  --border: #d8d4c5;
+  --border-strong: #b5b0a0;
+  --border-control: #8b8778; /* 3:1 on cream — see the dark-mode note */
+
+  --text-primary: #262b21;
+  --text-secondary: #4d543f;
+  --text-tertiary: #616a50;
+
+  /* Cream can't be its own accent on a cream page, so light mode promotes the
+     forest green to the signal colour — 9.55:1 as text, 12.27:1 under white
+     as a button fill. Foliage darkens to stay legible on light surfaces. */
+  --accent: #31372b;
+  --accent-hover: #262b21;
+  --accent-muted: #e4e8da;
+  --accent-contrast: #faf7ee;
+
+  --accent-2: #576c37;
+  --accent-2-muted: #e6eed7;
+
+  --machine: #6c7460;
+  --bark: #8a5f2e;
+
+  --danger: #c02428;
+  --danger-muted: #fbe0e1;
+  --warning: #8a5f06;
+  --warning-muted: #fbefd6;
+  --info: #1568a8;
+  --info-muted: #ddedfa;
+
+  color-scheme: light;
+}
+
+/* ============================================================================
+   Tailwind theme mapping — spec §1.1–§1.3
+   Utility names are the readable form; the comment gives the spec token.
+   ========================================================================= */
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Surfaces */
+  --color-void: var(--bg-void); /* --bg-void      → bg-void     */
+  --color-canvas: var(--bg-primary); /* --bg-primary   → bg-canvas   */
+  --color-surface: var(--bg-secondary); /* --bg-secondary → bg-surface  */
+  --color-raised: var(--bg-tertiary); /* --bg-tertiary  → bg-raised   */
+
+  /* Lines */
+  --color-line: var(--border); /* --border         → border-line         */
+  --color-line-strong: var(--border-strong); /* --border-strong  → border-line-strong  */
+  --color-line-control: var(--border-control); /* --border-control → border-line-control */
+
+  /* Text */
+  --color-fg: var(--text-primary); /* --text-primary   → text-fg    */
+  --color-muted: var(--text-secondary); /* --text-secondary → text-muted */
+  --color-faint: var(--text-tertiary); /* --text-tertiary  → text-faint */
+
+  /* Accent */
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-muted: var(--accent-muted);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-accent-2: var(--accent-2);
+  --color-accent-2-muted: var(--accent-2-muted);
+
+  /* Status — reserved for status pills, errors and alerts ONLY.
+     Never use these decoratively (spec §1.1 rationale). */
+  --color-danger: var(--danger);
+  --color-danger-muted: var(--danger-muted);
+  --color-warning: var(--warning);
+  --color-warning-muted: var(--warning-muted);
+  --color-info: var(--info);
+  --color-info-muted: var(--info-muted);
+
+  /* Type — spec §1.2 */
+  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  --text-xs: 0.75rem; /* 12px — labels, meta      */
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.875rem; /* 14px — body secondary, nav */
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1rem; /* 16px — body             */
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem; /* 18px — card titles      */
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.5rem; /* 24px — section headers  */
+  --text-xl--line-height: 2rem;
+  --text-2xl: 2rem; /* 32px — page titles      */
+  --text-2xl--line-height: 2.5rem;
+  --text-3xl: 3rem; /* 48px — hero headline    */
+  --text-3xl--line-height: 3.25rem;
+
+  /* Radii — spec §1.4 (cards 12px, inputs/buttons 8px) */
+  --radius-card: 0.75rem;
+  --radius-control: 0.5rem;
+
+  /* Content widths — spec §1.3 */
+  --container-content: 80rem; /* 1280px — marketing pages */
+  --container-dash: 70rem; /* 1120px — dashboard       */
+  --container-prose: 45rem; /* 720px  — About / legal   */
+
+  /* Breakpoints — spec §7 (these match Tailwind defaults; declared for clarity) */
+  --breakpoint-sm: 40rem; /* 640px  */
+  --breakpoint-md: 48rem; /* 768px  */
+  --breakpoint-lg: 64rem; /* 1024px */
+  --breakpoint-xl: 80rem; /* 1280px */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ============================================================================
+   Base
+   ----------------------------------------------------------------------------
+   Spacing discipline (spec §1.3): the 8px base unit is enforced by convention,
+   not by rewriting Tailwind's 4px step. Use EVEN steps only —
+   p-2 = 8px, p-4 = 16px, p-6 = 24px, p-8 = 32px, p-12 = 48px, p-16 = 64px.
+   No arbitrary pixel values in component code.
+   ========================================================================= */
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    background-color: var(--color-canvas);
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+  }
+
+  /* Spec §8 — visible focus ring on every interactive element, accent, 2px. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* We supply our own :focus-visible ring everywhere; suppress the default
+     ring on mouse focus only. */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  ::selection {
+    background-color: var(--color-accent);
+    color: var(--color-accent-contrast);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  /* Skeleton pulse — spec §1.4 loading state */
+  @keyframes dl-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+
+  .animate-skeleton {
+    animation: dl-pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes dl-toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .animate-toast-in {
+    animation: dl-toast-in 160ms ease-out;
+  }
+
+  @keyframes dl-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .animate-fade-in {
+    animation: dl-fade-in 140ms ease-out;
+  }
+
+  @keyframes dl-modal-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .animate-modal-in {
+    animation: dl-modal-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* ==========================================================================
+     Cinematic surfaces (home page redesign)
+     ========================================================================== */
+
+  /* Blueprint grid — the drafting substrate everything sits on. Fades out
+     toward the edges so it never reads as a hard-edged texture swatch. */
+  .blueprint {
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, var(--accent-2) 8%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, var(--accent-2) 8%, transparent) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(80% 70% at 50% 40%, #000 25%, transparent 78%);
+  }
+
+  .blueprint-fine {
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, var(--accent-2) 5%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, var(--accent-2) 5%, transparent) 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+
+  /* Rim lighting behind a section — the "key light" of the grade. */
+  .glow-accent {
+    background: radial-gradient(
+      60% 50% at 50% 50%,
+      color-mix(in oklab, var(--accent) 30%, transparent),
+      transparent 70%
+    );
+  }
+
+  .glow-accent-2 {
+    background: radial-gradient(
+      55% 50% at 50% 50%,
+      color-mix(in oklab, var(--accent-2) 22%, transparent),
+      transparent 70%
+    );
+  }
+
+  /* Vignette that seats full-bleed sections into the page. */
+  .vignette {
+    background: radial-gradient(120% 90% at 50% 45%, transparent 40%, var(--bg-void) 100%);
+  }
+
+  /* Hairline that fades at both ends — used as a section divider. */
+  .rule-fade {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--border-strong) 18%,
+      var(--border-strong) 82%,
+      transparent
+    );
+  }
+
+  /* Display type. Large sizes need tighter tracking and leading than body
+     copy — the defaults are tuned for paragraphs and look loose and amateur
+     at 96px. Optical tightening scales with size. */
+  .display-xl {
+    font-size: clamp(2.75rem, 7.4vw, 5.75rem);
+    line-height: 0.92;
+    letter-spacing: -0.042em;
+    font-weight: 700;
+    font-feature-settings: "ss01", "cv01";
+  }
+
+  .display-lg {
+    font-size: clamp(2rem, 4.6vw, 3.25rem);
+    line-height: 1;
+    letter-spacing: -0.032em;
+    font-weight: 600;
+  }
+
+  /* The mono/uppercase micro-label used for section indices and eyebrows.
+     One class so tracking and size stay identical everywhere they appear. */
+  .tech-label {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  /* Hairline rule that reads as a drafting registration mark. */
+  .tick-rule {
+    position: relative;
+  }
+  .tick-rule::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 0;
+    inset-block-start: -0.75rem;
+    inline-size: 2rem;
+    block-size: 2px;
+    background: var(--accent-2);
+  }
+
+  /* Molten gradient text for the one word that carries the headline. */
+  .text-accent-gradient {
+    background: linear-gradient(
+      100deg,
+      var(--accent) 0%,
+      color-mix(in oklab, var(--accent) 55%, var(--accent-2)) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Infinite ticker. Duplicated content in the DOM makes the loop seamless;
+     the wrapper is aria-hidden because it's decorative repetition. */
+  .marquee-track {
+    animation: dl-marquee 38s linear infinite;
+  }
+
+  @keyframes dl-marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  /* Slow ambient drift for the hero light — keeps a static frame alive. */
+  .drift {
+    animation: dl-drift 22s ease-in-out infinite alternate;
+  }
+
+  @keyframes dl-drift {
+    from {
+      transform: translate3d(-3%, -2%, 0) scale(1);
+    }
+    to {
+      transform: translate3d(3%, 2%, 0) scale(1.12);
+    }
+  }
+
+  /* Hero background mesh — spec §3.1.2, sits at low opacity behind text. */
+  .hero-mesh {
+    background-image:
+      radial-gradient(60% 55% at 20% 15%, color-mix(in oklab, var(--accent) 55%, transparent), transparent 70%),
+      radial-gradient(50% 50% at 85% 25%, color-mix(in oklab, var(--info) 40%, transparent), transparent 70%),
+      radial-gradient(60% 60% at 55% 95%, color-mix(in oklab, var(--accent) 30%, transparent), transparent 70%);
+  }
+
+  /* Theme toggle icons — driven purely by the data-theme attribute so the
+     button needs no client state. Sun = "you are in dark, switch to light". */
+  [data-theme="dark"] .theme-icon-light,
+  [data-theme="light"] .theme-icon-dark {
+    display: none;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ==========================================================================
+     Scroll motion system
+     --------------------------------------------------------------------------
+     The vocabulary is deliberately "print head + CAD annotation", not the
+     usual fade-everything-upward: content is WIPED into place bottom-up like a
+     part being printed layer by layer, headings are struck by a traversing
+     scan line, and cards acquire drafting brackets as they land.
+
+     Two safety rules hold everything together:
+       1. Nothing is hidden unless JS is present to un-hide it. The initial
+          hidden state is scoped to [data-js], which the inline theme script
+          sets. With JS off, every page renders fully visible.
+       2. Under prefers-reduced-motion the hidden state is switched off
+          entirely (below), so content is never gated behind an animation
+          somebody has asked not to see.
+     ========================================================================== */
+
+  [data-reveal] {
+    --reveal-delay: 0ms;
+    --reveal-duration: 800ms;
+    transition:
+      opacity var(--reveal-duration) cubic-bezier(0.16, 1, 0.3, 1) var(--reveal-delay),
+      transform var(--reveal-duration) cubic-bezier(0.16, 1, 0.3, 1) var(--reveal-delay),
+      clip-path var(--reveal-duration) cubic-bezier(0.16, 1, 0.3, 1) var(--reveal-delay);
+  }
+
+  [data-js] [data-reveal]:not([data-revealed]) {
+    opacity: 0;
+  }
+
+  /* Rise — the quiet one, for prose and headings. */
+  [data-js] [data-reveal="up"]:not([data-revealed]) {
+    transform: translateY(1.25rem);
+  }
+
+  /* Layer — the signature. Wipes in bottom-up, the way a print grows off the
+     bed, with a slight settle. Used on cards and visual blocks. */
+  [data-js] [data-reveal="layer"]:not([data-revealed]) {
+    clip-path: inset(100% 0 0 0);
+    transform: translateY(0.75rem);
+  }
+
+  [data-reveal="layer"] {
+    clip-path: inset(0 0 0 0);
+  }
+
+  /* Scan — a hairline of accent travels the full width once, like a print head
+     traversing, then the rule settles to its normal border colour. */
+  .scan-rule {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .scan-rule::after {
+    content: "";
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    block-size: 1px;
+    inline-size: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--accent) 35%,
+      var(--accent) 65%,
+      transparent 100%
+    );
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+
+  [data-revealed] .scan-rule::after,
+  .scan-rule[data-revealed]::after {
+    animation: dl-scan 1400ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+  }
+
+  @keyframes dl-scan {
+    0% {
+      transform: translateX(-100%);
+      opacity: 0;
+    }
+    12% {
+      opacity: 1;
+    }
+    88% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+  }
+
+  /* Brackets — drafting/selection corners that draw themselves onto a card as
+     it lands, then hold at low opacity. Pure pseudo-elements, no extra DOM. */
+  .cad-brackets::before,
+  .cad-brackets::after {
+    content: "";
+    position: absolute;
+    inline-size: 0.75rem;
+    block-size: 0.75rem;
+    border-color: var(--accent);
+    opacity: 0;
+    transition: opacity 500ms ease 420ms;
+    pointer-events: none;
+  }
+
+  .cad-brackets::before {
+    inset-block-start: -1px;
+    inset-inline-start: -1px;
+    border-block-start: 1px solid;
+    border-inline-start: 1px solid;
+    border-start-start-radius: var(--radius-card);
+  }
+
+  .cad-brackets::after {
+    inset-block-end: -1px;
+    inset-inline-end: -1px;
+    border-block-end: 1px solid;
+    border-inline-end: 1px solid;
+    border-end-end-radius: var(--radius-card);
+  }
+
+  [data-revealed] .cad-brackets::before,
+  [data-revealed] .cad-brackets::after {
+    opacity: 0.55;
+  }
+
+  .cad-brackets:hover::before,
+  .cad-brackets:hover::after {
+    opacity: 1;
+    transition-delay: 0ms;
+  }
+
+  /* ==========================================================================
+     Scroll-driven effects (CSS scroll timelines)
+     --------------------------------------------------------------------------
+     These are continuous — tied to scroll POSITION, not to a one-shot trigger,
+     which is what makes the page feel cinematic rather than merely animated.
+     They are gated behind @supports so browsers without scroll timelines get
+     the static layout rather than a broken one. No JS scroll listener is
+     involved, so none of this touches the main thread during scroll.
+     ========================================================================== */
+
+  /* Base state for the two scroll-linked rails is EMPTY, so a browser without
+     scroll timelines (and reduced-motion users) simply never sees a rail,
+     rather than seeing one stuck at 100%. */
+  .scroll-rail {
+    transform: scaleX(0);
+    transform-origin: 0 50%;
+  }
+
+  .step-rail-fill {
+    transform: scaleY(0);
+    transform-origin: 50% 0;
+  }
+
+  @media (width >= 48rem) {
+    .step-rail-fill {
+      transform: scaleX(0);
+      transform-origin: 0 50%;
+    }
+  }
+
+  @supports (animation-timeline: scroll()) {
+    /* Print-progress rail under the sticky nav: fills as you move down the
+       document, like a job progress bar. */
+    .scroll-rail {
+      animation: dl-rail linear both;
+      animation-timeline: scroll(root block);
+    }
+
+    @keyframes dl-rail {
+      from {
+        transform: scaleX(0);
+      }
+      to {
+        transform: scaleX(1);
+      }
+    }
+
+    /* Hero focus pull: as the hero leaves, the copy drifts up a touch slower
+       than the page and dims, while the mesh behind it swells. Reads like a
+       camera racking focus off the title card. */
+    .hero-pull {
+      animation: dl-hero-pull linear both;
+      animation-timeline: view();
+      animation-range: exit 0% exit 90%;
+    }
+
+    @keyframes dl-hero-pull {
+      to {
+        opacity: 0;
+        transform: translateY(-2.5rem);
+      }
+    }
+
+    .hero-swell {
+      animation: dl-hero-swell linear both;
+      animation-timeline: view();
+      animation-range: exit 0% exit 100%;
+    }
+
+    @keyframes dl-hero-swell {
+      to {
+        transform: scale(1.25);
+        opacity: 0.45;
+      }
+    }
+
+    /* How-it-works rail: the connector between the numbered steps fills with
+       accent as the section passes through the viewport. */
+    .step-rail-fill {
+      animation: dl-step-rail linear both;
+      animation-timeline: view();
+      animation-range: entry 60% cover 55%;
+    }
+
+    @keyframes dl-step-rail {
+      from {
+        transform: scaleY(0);
+      }
+      to {
+        transform: scaleY(1);
+      }
+    }
+
+    @media (width >= 48rem) {
+      @keyframes dl-step-rail {
+        from {
+          transform: scaleX(0);
+        }
+        to {
+          transform: scaleX(1);
+        }
+      }
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Switch the reveal system's hidden state off entirely rather than merely
+     shortening it — content must never be gated behind an animation the user
+     has asked not to see, and a scroll-linked effect can't "finish" early. */
+  [data-js] [data-reveal]:not([data-revealed]) {
+    opacity: 1 !important;
+    transform: none !important;
+    clip-path: none !important;
+  }
+
+  .scan-rule::after,
+  .cad-brackets::before,
+  .cad-brackets::after {
+    display: none !important;
+  }
+
+  .hero-pull,
+  .hero-swell,
+  .scroll-rail,
+  .step-rail-fill,
+  .marquee-track,
+  .drift {
+    animation: none !important;
+  }
 }

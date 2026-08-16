@@ -1,36 +1,139 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DripLink Website
 
-## Getting Started
+Public marketing site + auth + post-login dashboard, built to the DripLink UI/UX spec.
 
-First, run the development server:
+Next.js 16 (App Router) · React 19 · Tailwind CSS v4 · Supabase.
+
+## Running it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install && npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Copy `.env.example` to `.env.local` and fill in your Supabase keys. **Without them the app
+runs in "backend not connected" mode**: every dashboard panel renders its real empty state,
+a banner says so explicitly, and auth is inert. No sample data is ever substituted — see
+"The no-fabricated-data rule" below.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Layout
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+app/
+  (marketing)/     Home, LeaFF OS, Mart, App, About, Contact, Terms, Privacy
+  (auth)/          Login, Signup, Password reset
+  dashboard/       Shell + Overview, Models, Mart Orders, Billing, Account
+  actions.ts       Server actions for the waitlist + contact forms
+components/
+  ui/              Button, Card, Input, Modal, Toast, StatusPill, EmptyState, Skeleton, Spinner
+  marketing/       Nav, Footer, Hero, PillarCard, HowItWorks, WaitlistForm, CtaBand, …
+  auth/            AuthCard, LoginForm, SignupForm, PasswordRequirements
+  dashboard/       Shell, StatCard, ModelCard, OrderRow, LedgerTable, CreditBuyModal, …
+lib/
+  supabase.ts        Browser client + config (single source of truth for env)
+  supabase-server.ts Server client (cookie-bound) + getCurrentUser
+  queries.ts         All dashboard reads
+  types.ts           The shapes the UI is written against
+  format.ts          Date / currency / credit formatters
+proxy.ts           Supabase session refresh (Next 16 renamed middleware → proxy)
+```
 
-## Learn More
+## Design tokens
 
-To learn more about Next.js, take a look at the following resources:
+`app/globals.css` holds the spec's tokens under their spec names (`--bg-primary`,
+`--text-secondary`, …), mapped to readable Tailwind utilities in the `@theme` block —
+`bg-canvas`, `bg-surface`, `bg-raised`, `text-fg`, `text-muted`, `text-faint`,
+`border-line`, plus `accent` and the status colours. The comment beside each mapping gives
+the spec name.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Dark is the default. Light is an opt-in toggle stored in `localStorage` and applied before
+first paint by `components/theme-script.tsx`; it is deliberately **not** driven by
+`prefers-color-scheme`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Spacing keeps Tailwind's 4px step rather than redefining it, and the spec's 8px base is
+enforced by convention: **use even steps only** (`p-2` 8px, `p-4` 16px, `p-6` 24px,
+`p-8` 32px, `p-12` 48px, `p-16` 64px). Redefining `--spacing` to 8px would have silently
+doubled every `h-*`/`w-*` in the codebase.
 
-## Deploy on Vercel
+## Scroll motion
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The vocabulary is "print head + CAD annotation" rather than generic fade-up, to stay on the
+spec's technical/CAD-adjacent side:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Effect | Where | Driven by |
+| --- | --- | --- |
+| Progress rail filling left→right | under the sticky nav | CSS `scroll(root)` timeline |
+| Hero focus-pull (copy drifts + dims, mesh swells) | Home + product heroes | CSS `view()` timeline |
+| Layer wipe — content grows bottom-up like a print | pillar/feature/flow cards | IntersectionObserver + CSS transition |
+| Scan line traversing the heading rule | every `SectionHeading` | CSS keyframes on reveal |
+| Drafting brackets drawing onto corners | cards | CSS pseudo-elements on reveal |
+| Step connector drawing itself | How it works | CSS `view()` timeline |
+
+The continuous effects use CSS scroll timelines, so **no scroll listener runs on the main
+thread**. They're gated behind `@supports (animation-timeline: scroll())`; without support
+the layout is simply static, and both rails default to empty rather than stuck at 100%.
+
+Three safety properties, each verified by selector matching rather than assumed:
+
+1. The hidden pre-reveal state is scoped to `[data-js]`, stamped by the inline theme script.
+   With scripting off, **0** elements are hidden.
+2. `Reveal` shows content immediately if `IntersectionObserver` is unavailable.
+3. Under `prefers-reduced-motion` the hidden state is switched **off entirely**, not merely
+   shortened — a scroll-linked animation can't "finish early", so shortening it would leave
+   content permanently invisible.
+
+## The no-fabricated-data rule
+
+Every dashboard panel is wired to a real Supabase query from day one. Before the backend
+exists those queries return empty and the UI shows its real empty state. Specifically:
+
+- Unknown numbers render an em dash, never `0`. A `0` only ever means the backend returned 0.
+- The waitlist and contact forms report honestly when they can't reach a backend instead of
+  returning a fake success.
+- Legal pages render their section outline and a "not yet drafted" warning rather than
+  invented clauses.
+- Product pages use a labelled `AssetSlot` frame where a real screenshot/recording goes,
+  rather than a mocked-up fake.
+
+## What Track 2 needs to provide
+
+Tables the UI already queries (see `lib/types.ts` for exact fields):
+
+| Table | Used by |
+| --- | --- |
+| `profiles` | credit chip, Overview, Billing, Account |
+| `models` | Overview, My Models |
+| `mart_orders` | Overview, Mart Orders, order detail |
+| `credit_ledger` | Billing ledger (paginated, 20/page) |
+| `waitlist` | marketing waitlist form |
+| `contact_messages` | contact form |
+
+Endpoints still to build, each currently failing honestly with a toast:
+
+- `POST /api/billing/checkout` → returns `{ redirectUrl }` for Razorpay.
+- `DELETE /api/account` → account deletion (needs the service-role key).
+- Session listing for Account → Active sessions. `supabase-js` has no client-side
+  "list my sessions" call, so this needs a server route; the section renders its empty
+  state until then.
+
+Also add an `avatars` storage bucket for profile pictures.
+
+## Verified
+
+- `npm run build` and `npx eslint .` both clean.
+- All 16 routes return 200.
+- No horizontal overflow at 320 / 375 / 768 / 1024 / 1280 px on any page.
+- Sidebar 240px at ≥1024px, bottom tab bar below it, 56px top bar at every width.
+- Contrast (WCAG AA): `#9AA3AB` on `#0B0D0F` = **7.60:1**, as spec §8 asked to confirm.
+  Full audit of every token pair in both themes was run; see the caveat below.
+
+## Known gaps
+
+- **`--text-tertiary` fails AA as body text.** `#5C666E` is 3.32:1 on `--bg-primary` and
+  2.80:1 on `--bg-tertiary`. It's used for `text-xs` meta (dates, hints), which WCAG treats
+  as normal text needing 4.5:1. The token is left at its spec value — it's a design
+  decision, not a bug to fix unilaterally. `#7A8892` clears AA on every surface if you want
+  it fixed.
+- Founder names/bios on About, the `hello@driplink.in` address, and the social URLs are
+  marked placeholders in code.
+- `/login/reset` was added because §4.1 puts a "Forgot password?" link on the login card,
+  though the page isn't in the §2 site map.
