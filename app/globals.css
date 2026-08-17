@@ -50,6 +50,21 @@
   /* Canvas-only material tones for the hero scene. */
   --machine: #97a189; /* printer frame — sage, quieter than the tree */
   --bark: #c08b52; /* trunk + branches */
+  --brass: #d9b45c; /* lead screw, pulleys — the machine's warm metal */
+
+  /* ------------------------------------------------------------------------
+     Brand logo.
+     The artwork is white-on-black, which only reads against the mid-grey it
+     was rendered on: on this site's dark surfaces the black half measures
+     1.27:1, and on the cream surfaces the white half measures 1.00:1 — one
+     half always disappears.
+     So each theme keeps the tone that WORKS at its literal artwork value and
+     shifts only the other, far enough to clear 3:1. The rule that carries the
+     identity — the L is always lighter than the D — holds in both.
+     DARK: L literal white, D lifted to a sage mid tone.
+     ---------------------------------------------------------------------- */
+  --logo-paper: #f7f7f5; /* L + "Drip" — literal artwork white */
+  --logo-ink: #829073; /* D + "Link" — lifted; #141414 is invisible here */
 
   --danger: #ffafa8;
   --danger-muted: #43302c;
@@ -89,6 +104,11 @@
 
   --machine: #6c7460;
   --bark: #8a5f2e;
+  --brass: #8a6d1f;
+  /* LIGHT: D keeps the literal artwork black; the L shifts down, because
+     white-on-cream is 1.00:1 — the exact bug this fixes. */
+  --logo-paper: #848073; /* L + "Drip" — darkened to clear the cream */
+  --logo-ink: #141414; /* D + "Link" — literal artwork black */
 
   --danger: #c02428;
   --danger-muted: #fbe0e1;
@@ -432,11 +452,39 @@
       radial-gradient(60% 60% at 55% 95%, color-mix(in oklab, var(--accent) 30%, transparent), transparent 70%);
   }
 
-  /* Theme toggle icons — driven purely by the data-theme attribute so the
-     button needs no client state. Sun = "you are in dark, switch to light". */
+  /* Theme toggle — knob position, icon swap and glow all derive from the
+     data-theme attribute, so the button needs no client state.
+     Lit cube (rays) = light side, plain cube = dark side. */
   [data-theme="dark"] .theme-icon-light,
   [data-theme="light"] .theme-icon-dark {
     display: none;
+  }
+
+  .theme-knob {
+    /* Travel = track 64px − 2px border − 8px padding − 24px knob = 30px.
+       Not 32px: the 1px borders are easy to forget and the knob then sits
+       2px tighter on the right than the left, which reads as sloppy. */
+    transition:
+      transform 280ms cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 280ms ease,
+      color 280ms ease;
+    color: var(--accent-2);
+  }
+
+  [data-theme="dark"] .theme-knob {
+    transform: translateX(30px);
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--accent-2) 70%, transparent),
+      0 0 14px -2px color-mix(in oklab, var(--accent-2) 85%, transparent),
+      0 1px 2px rgb(0 0 0 / 0.4);
+  }
+
+  [data-theme="light"] .theme-knob {
+    transform: translateX(0);
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--accent-2) 60%, transparent),
+      0 0 12px -3px color-mix(in oklab, var(--accent-2) 70%, transparent),
+      0 1px 2px rgb(0 0 0 / 0.15);
   }
 
   .scrollbar-none {

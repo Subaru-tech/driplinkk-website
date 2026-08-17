@@ -1,24 +1,61 @@
 import { cn } from "@/lib/cn";
 
 /**
- * Placeholder wordmark — a droplet fused to a link, in the accent green.
- * Swap for the real DripLink logo asset when brand delivers it.
+ * The DripLink identity: a D/L monogram plus the wordmark.
+ *
+ * The mark is an interlocking ligature — the L's vertical stem doubles as the
+ * D's spine, and the L sits in front where they cross. Rebuilt as vector paths
+ * (rather than shipping the raster) so it stays crisp at every size, costs no
+ * request, and can be drawn on canvas as well as in the DOM.
+ *
+ * COLOUR: fixed to the artwork's own two tones — white L + "Drip", black D +
+ * "Link" — and deliberately NOT theme-derived, so the logo looks identical
+ * everywhere. See `--logo-paper` / `--logo-ink` in globals.css. Note this
+ * means the black half has very little contrast against dark surfaces; the
+ * knockout alternative is to point the D at `currentColor` instead.
  */
-export function Wordmark({ className }: { className?: string }) {
+
+export function DripLinkMark({ className }: { className?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-2", className)}>
-      <svg viewBox="0 0 24 24" className="size-6 text-accent" aria-hidden="true" fill="none">
-        <path
-          d="M12 3.5c3.2 3.6 5.2 6.3 5.2 8.8a5.2 5.2 0 1 1-10.4 0c0-2.5 2-5.2 5.2-8.8Z"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-        <path d="M9.8 12.3h4.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      </svg>
-      <span className="font-display text-base font-semibold tracking-tight text-fg">
-        DripLink
-      </span>
+    <svg
+      viewBox="0 0 61 68"
+      fill="none"
+      className={cn("h-6 w-auto", className)}
+      aria-hidden="true"
+    >
+      {/* The D — drawn first so the L overlaps it, as in the artwork. */}
+      <path
+        d="M5 0 H35.2 A25.4 25.4 0 0 1 35.2 50.8 H5 Z
+           M21.8 16.7 H33.7 A8.8 8.8 0 0 1 33.7 34.3 H21.8 Z"
+        fillRule="evenodd"
+        fill="var(--logo-ink)"
+      />
+      {/* The L — its stem crosses in front of the D's spine. */}
+      <path d="M0 6.8 L15.5 20.7 V50.8 H56 V68 H0 Z" fill="var(--logo-paper)" />
+    </svg>
+  );
+}
+
+export function Wordmark({
+  className,
+  /** Monogram only — for the collapsed dashboard sidebar. */
+  markOnly = false,
+}: {
+  className?: string;
+  markOnly?: boolean;
+}) {
+  return (
+    <span className={cn("inline-flex items-center gap-2.5", className)}>
+      <DripLinkMark className={markOnly ? "h-7" : "h-6"} />
+      {markOnly ? null : (
+        <span
+          className="font-display text-base font-semibold tracking-tight"
+          style={{ color: "var(--logo-paper)" }}
+        >
+          Drip
+          <span style={{ color: "var(--logo-ink)" }}>Link</span>
+        </span>
+      )}
     </span>
   );
 }

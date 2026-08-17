@@ -1,4 +1,3 @@
-import { ArrowDown } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { PrintCanvas } from "@/components/marketing/print-canvas";
 
@@ -69,14 +68,6 @@ export function CinematicHero() {
         </div>
       </div>
 
-      {/* Scroll cue */}
-      <a
-        href="#problem"
-        className="absolute inset-x-0 bottom-8 mx-auto flex w-fit flex-col items-center gap-2 text-faint transition-colors hover:text-fg"
-      >
-        <span className="font-mono text-[0.625rem] tracking-[0.2em] uppercase">Scroll</span>
-        <ArrowDown className="size-4 animate-bounce" aria-hidden="true" />
-      </a>
     </section>
   );
 }

@@ -49,6 +49,17 @@ const M = {
 /** Model units from the gantry beam's origin down to the nozzle tip. */
 const NOZZLE_DROP = 42;
 
+/**
+ * The DripLink monogram, as canvas paths.
+ *
+ * Byte-identical to the `d` attributes in components/marketing/wordmark.tsx —
+ * one shape, two renderers. Built lazily because Path2D doesn't exist during
+ * server rendering.
+ */
+const MARK_D_PATH =
+  "M5 0 H35.2 A25.4 25.4 0 0 1 35.2 50.8 H5 Z M21.8 16.7 H33.7 A8.8 8.8 0 0 1 33.7 34.3 H21.8 Z";
+const MARK_L_PATH = "M0 6.8 L15.5 20.7 V50.8 H56 V68 H0 Z";
+
 const BBOX = {
   left: -M.baseW / 2 - 4,
   right: M.spool.x + M.spool.r + 4,
@@ -147,6 +158,13 @@ export function PrintCanvas({ className }: { className?: string }) {
     let foliage = readRgb(rootStyles, "--accent-2", [169, 210, 107]);
     let machine = readRgb(rootStyles, "--machine", [151, 161, 137]);
     let bark = readRgb(rootStyles, "--bark", [192, 139, 82]);
+    let brass = readRgb(rootStyles, "--brass", [217, 180, 92]);
+    let logoPaper = readRgb(rootStyles, "--logo-paper", [247, 247, 245]);
+    let logoInk = readRgb(rootStyles, "--logo-ink", [20, 20, 20]);
+
+    /* Path2D is browser-only, so build inside the effect. */
+    const MARK_D = new Path2D(MARK_D_PATH);
+    const MARK_L = new Path2D(MARK_L_PATH);
 
     const resize = () => {
       const w = canvas.clientWidth;
@@ -272,50 +290,6 @@ export function PrintCanvas({ className }: { className?: string }) {
       ctx.textAlign = "left";
     };
 
-    /** Arrowhead for the dimension callouts. */
-    const arrow = (x: number, y: number, dir: "up" | "down" | "left" | "right", color: Rgb) => {
-      const a = 3.2;
-      ctx.beginPath();
-      if (dir === "up" || dir === "down") {
-        const s = dir === "up" ? 1 : -1;
-        ctx.moveTo(sx(x), sy(y));
-        ctx.lineTo(sx(x - a * 0.55), sy(y - s * a));
-        ctx.lineTo(sx(x + a * 0.55), sy(y - s * a));
-      } else {
-        const s = dir === "right" ? 1 : -1;
-        ctx.moveTo(sx(x), sy(y));
-        ctx.lineTo(sx(x - s * a), sy(y - a * 0.55));
-        ctx.lineTo(sx(x - s * a), sy(y + a * 0.55));
-      }
-      ctx.closePath();
-      ctx.fillStyle = rgba(color, 0.75);
-      ctx.fill();
-    };
-
-    /**
-     * Engineering dimension callout — extension lines, arrowheads, and a
-     * measurement. This is what makes the drawing read as a deliberate
-     * technical illustration rather than a rough wireframe, and it's the
-     * right register for a CAD product.
-     */
-    const dimensionV = (x: number, y0: number, y1: number, text: string, color: Rgb) => {
-      seg(x, y0, x, y1, color, 0.4);
-      arrow(x, y0, "down", color);
-      arrow(x, y1, "up", color);
-      seg(x - 3, y0, x + 3, y0, color, 0.35);
-      seg(x - 3, y1, x + 3, y1, color, 0.35);
-      label(text, x - 5, (y0 + y1) / 2, 7, color, 0.75, "right");
-    };
-
-    const dimensionH = (y: number, x0: number, x1: number, text: string, color: Rgb) => {
-      seg(x0, y, x1, y, color, 0.4);
-      arrow(x0, y, "left", color);
-      arrow(x1, y, "right", color);
-      seg(x0, y - 3, x0, y + 3, color, 0.35);
-      seg(x1, y - 3, x1, y + 3, color, 0.35);
-      label(text, (x0 + x1) / 2, y - 7, 7, color, 0.75, "center");
-    };
-
     const draw = (now: number) => {
       syncSize();
       /* Nothing to draw into yet — keep the loop alive and try next frame. */
@@ -342,16 +316,10 @@ export function PrintCanvas({ className }: { className?: string }) {
 
       /* Wide layouts draw dimension callouts, which sit outside the machine —
          reserve that space in the fit box so they can't clip. */
-      /* Derived from the machine, not hardcoded — the callouts sit a fixed
-         distance off the base, so they must move when the base width does. */
-      const bbox = wide
-        ? {
-            left: -M.baseW / 2 - 56, // dimension line at -22, plus its label
-            right: BBOX.right,
-            top: BBOX.top,
-            bottom: -44, // horizontal callout at -26, plus its label
-          }
-        : BBOX;
+      /* One fit box for every layout now that the dimension callouts are gone
+         — nothing extends past the machine, so no extra margin to reserve.
+         The machine gains that reclaimed space. */
+      const bbox = BBOX;
       const modelH = bbox.top - bbox.bottom;
       const modelW = bbox.right - bbox.left;
       /* Narrow screens can't fit a full machine AND the whole copy block, so
@@ -379,6 +347,25 @@ export function PrintCanvas({ className }: { className?: string }) {
 
       const built = Math.floor(build * LAYERS);
       const printed = (built / LAYERS) * M.printH;
+
+      /* ---- what the head is actually printing right now -------------------
+         The nozzle has to know the CURRENT layer's real extent before it can
+         move, otherwise it just sweeps a fixed arc and spends half its time
+         extruding over thin air. Compute the live layer's silhouette here so
+         both the head and the bead can be driven from it. */
+      const cosS = Math.cos(spin);
+      const sinS = Math.sin(spin);
+      const TREE_SCALE = M.printH * 0.98;
+
+      const liveT = LAYERS > 1 ? Math.min(1, built / (LAYERS - 1)) : 0;
+      const liveSpans: { a: number; b: number }[] = [];
+      for (const s of crossSections(liveT)) {
+        const rx = (s.cx * cosS - s.cz * sinS) * TREE_SCALE;
+        const hw = s.r * TREE_SCALE;
+        liveSpans.push({ a: rx - hw, b: rx + hw });
+      }
+      const layerMin = liveSpans.length ? Math.min(...liveSpans.map((s) => s.a)) : 0;
+      const layerMax = liveSpans.length ? Math.max(...liveSpans.map((s) => s.b)) : 0;
       const detail = unit > 1.1; // only draw fine detail when it will read
 
       /* ==================================================== BASE + SCREEN */
@@ -400,12 +387,67 @@ export function PrintCanvas({ className }: { className?: string }) {
         rect(scrX + 4, scrY + 6, (scrW - 30) * build, 4, foliage, 0, 0.9, 1);
         label(`${Math.round(build * 100)}%`, scrX + scrW - 22, scrY + 8, 5.4, cream, 0.9);
       }
-      /* Knob, USB, feet */
+      /* [17] Rotary control knob, [18] USB port, feet */
       circle(scrX + scrW + 16, scrY + scrH / 2, 9, foliage, 0.9, 0.16, 1.8);
       circle(scrX + scrW + 16, scrY + scrH / 2, 4, foliage, 0.55, 0);
       seg(scrX + scrW + 16, scrY + scrH / 2 + 4, scrX + scrW + 16, scrY + scrH / 2 + 8.5, foliage, 0.9, 1.4);
       rect(scrX + scrW + 34, scrY + 8, 10, 5, machine, 0.6, 0.14, 1);
       for (const s of [-1, 1]) rect(s * (M.baseW / 2 - 18) - 6, -9, 12, 9, machine, 0.65, 0.2, 1.5);
+
+      if (detail) {
+        /* [19] Mainboard and [20] power supply live INSIDE the base — a front
+           elevation genuinely cannot see them. Rather than float them somewhere
+           they don't belong, both are drawn at low alpha behind their access
+           panel and vent, which is how you'd actually glimpse them. */
+        rect(46, 7, 30, 22, machine, 0.35, 0.08, 1); // access panel
+        rect(50, 11, 22, 14, foliage, 0.45, 0.1, 0.8); // PCB
+        for (const [cx, cy, w, h] of [
+          [53, 19, 5, 4],
+          [61, 20, 4, 3],
+          [53, 13, 3, 2],
+          [66, 13, 4, 5],
+        ] as const) {
+          rect(cx, cy, w, h, machine, 0.5, 0.25, 0.4);
+        }
+
+        /* [20] Power supply — vent louvres, with its cooling fan behind them */
+        rect(M.baseW / 2 - 50, 5, 44, 28, machine, 0.4, 0, 1.5);
+        circle(M.baseW / 2 - 28, 19, 8, machine, 0.4, 0.1);
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * Math.PI * 2 + 0.3;
+          seg(
+            M.baseW / 2 - 28 + Math.cos(a) * 2,
+            19 + Math.sin(a) * 2,
+            M.baseW / 2 - 28 + Math.cos(a) * 7,
+            19 + Math.sin(a) * 7,
+            machine,
+            0.35,
+            0.8,
+          );
+        }
+        for (let i = 0; i < 8; i++) {
+          const vx = M.baseW / 2 - 47 + i * 5;
+          seg(vx, 8, vx, 30, machine, 0.45);
+        }
+
+        /* [14] Y-axis stepper, mounted on the base front-left. */
+        rect(-M.baseW / 2 + 4, 6, 16, 18, machine, 0.7, 0.2, 1.5);
+        circle(-M.baseW / 2 + 12, 15, 4, machine, 0.6, 0.15);
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2 + 0.7;
+          circle(-M.baseW / 2 + 12 + Math.cos(a) * 5.8, 15 + Math.sin(a) * 5.8, 1.1, machine, 0.5);
+        }
+      }
+
+      /* [15] Corner brackets tying the uprights into the base frame. */
+      if (detail) {
+        for (const s of [-1, 1]) {
+          const bx = s * M.postX;
+          seg(bx - s * 12, M.baseH + 1, bx + s * 8, M.baseH + 1, machine, 0.55, 1.4);
+          seg(bx - s * 12, M.baseH + 1, bx - s * 12, M.baseH + 11, machine, 0.55, 1.4);
+          circle(bx - s * 8, M.baseH + 6, 1.6, machine, 0.45);
+        }
+      }
 
       /* ========================================================= UPRIGHTS */
       for (const s of [-1, 1]) {
@@ -419,24 +461,63 @@ export function PrintCanvas({ className }: { className?: string }) {
           circle(s * M.postX, M.baseH + 8, 2.2, machine, 0.5);
           circle(s * M.postX, M.frameTop - 8, 2.2, machine, 0.5);
         }
-        /* Z lead screw */
-        seg(s * M.postX, M.baseH + 6, s * M.postX, M.frameTop - 6, cream, 0.16, 1.2);
+      }
+
+      /* [10] Z-axis lead screw — brass, threaded, on the right upright, with
+         its coupler and stepper at the foot. The left upright carries a plain
+         smooth rod, which is how a single-Z bed-slinger is actually built. */
+      const zx = M.postX;
+      seg(zx, M.baseH + 10, zx, M.frameTop - 8, brass, 0.55, 2.6);
+      if (detail) {
+        /* thread — short diagonals up the rod */
+        for (let y = M.baseH + 12; y < M.frameTop - 10; y += 5) {
+          seg(zx - 2.6, y, zx + 2.6, y + 2.6, brass, 0.45, 1);
+        }
+        /* brass nut riding at the gantry height */
+        rect(zx - 5, M.bedY + 6 + printed + 30, 10, 9, brass, 0.8, 0.3, 1);
+        /* coupler + [Other] Z stepper motor */
+        rect(zx - 4, M.baseH + 2, 8, 9, brass, 0.7, 0.25, 1);
+        rect(zx - 10, M.baseH - 16, 20, 18, machine, 0.75, 0.22, 1.5);
+        circle(zx, M.baseH - 7, 4, machine, 0.6, 0.15);
+      }
+      /* smooth Z rod on the left */
+      seg(-M.postX, M.baseH + 8, -M.postX, M.frameTop - 8, cream, 0.2, 1.6);
+
+      if (detail) {
+        /* [Other] Limit switches. Z homes at the bottom of its travel and X at
+           the left end, so each sits on the frame — not on the moving part. */
+        rect(M.postX + 8, M.baseH + 12, 7, 5, machine, 0.6, 0.18, 0.8);
+        rect(-M.postX - 15, M.frameTop - 30, 7, 5, machine, 0.6, 0.18, 0.8);
       }
 
       /* ========================================================= CROSSBAR */
       rect(-M.postX - M.postW / 2, M.frameTop, M.postX * 2 + M.postW, M.barH, machine, 0.85, 0.2, 2);
       if (detail) {
-        /* DripLink droplet mark + wordmark, as on the reference machine */
-        const lx = -22;
-        const ly = M.frameTop + M.barH / 2;
-        ctx.beginPath();
-        ctx.moveTo(sx(lx), sy(ly + 5));
-        ctx.quadraticCurveTo(sx(lx + 4.5), sy(ly), sx(lx), sy(ly - 5));
-        ctx.quadraticCurveTo(sx(lx - 4.5), sy(ly), sx(lx), sy(ly + 5));
-        ctx.strokeStyle = rgba(cream, 0.9);
-        ctx.lineWidth = lw(1.3);
-        ctx.stroke();
-        label("DripLink", lx + 8, ly, 8, cream, 0.9);
+        /* The real DripLink monogram, badged on the crossbar. Same path data
+           as the DOM logo, so the two can never drift apart. */
+        const markH = 11;
+        const markW = (markH * 61) / 68;
+        const barMidY = M.frameTop + M.barH / 2;
+        const markX = -26;
+
+        ctx.save();
+        /* Path2D coordinates run y-down; translate to the mark's TOP edge and
+           scale into model units before filling. */
+        ctx.translate(sx(markX), sy(barMidY + markH / 2));
+        const ms = (markH * unit) / 68;
+        ctx.scale(ms, ms);
+        ctx.fillStyle = rgba(logoInk, 1);
+        ctx.fill(MARK_D, "evenodd");
+        ctx.fillStyle = rgba(logoPaper, 1);
+        ctx.fill(MARK_L);
+        ctx.restore();
+
+        /* Wordmark beside it, split in the logo's two tones. */
+        const textX = markX + markW + 4;
+        label("Drip", textX, barMidY, 8, logoPaper, 1);
+        ctx.font = `${8 * unit}px ui-monospace, "SFMono-Regular", monospace`;
+        const dripW = ctx.measureText("Drip").width / unit;
+        label("Link", textX + dripW, barMidY, 8, logoInk, 1);
       }
 
       /* ============================================================== BED */
@@ -447,13 +528,40 @@ export function PrintCanvas({ className }: { className?: string }) {
         const gx = -M.bedW / 2 + (i / 12) * M.bedW;
         seg(gx, plateY + 5.5, gx, plateY + 1, machine, 0.32);
       }
-      /* Y carriage + levelling knobs + rails */
+      /* [14] Y carriage under the plate */
       rect(-M.bedW / 2 + 10, plateY - 7, M.bedW - 20, 7, machine, 0.6, 0.16, 1);
+
       if (detail) {
+        /* [11] Magnetic PEI sheet branding, as on the reference machine */
+        label("DripLink", -13, plateY + 2.6, 5, machine, 0.5);
+
+        /* [13] Bed springs + [12] levelling knobs at each corner */
         for (const s of [-1, 1]) {
-          circle(s * (M.bedW / 2 - 16), plateY - 10, 3, machine, 0.55, 0.1);
+          const kx = s * (M.bedW / 2 - 18);
+          /* compression spring drawn as a zigzag */
+          ctx.beginPath();
+          for (let i = 0; i <= 6; i++) {
+            const yy = plateY - 1 - i * 1.1;
+            const xx = kx + (i % 2 === 0 ? -2.4 : 2.4);
+            if (i === 0) ctx.moveTo(sx(xx), sy(yy));
+            else ctx.lineTo(sx(xx), sy(yy));
+          }
+          ctx.strokeStyle = rgba(machine, 0.6);
+          ctx.lineWidth = lw(1.1);
+          ctx.stroke();
+          circle(kx, plateY - 11, 3.4, machine, 0.7, 0.2);
         }
-        seg(-M.bedW / 2 + 4, plateY - 9, M.bedW / 2 - 4, plateY - 9, machine, 0.28);
+
+        /* [14] Y-axis rail and timing belt beneath the carriage */
+        seg(-M.bedW / 2 + 4, plateY - 10, M.bedW / 2 - 4, plateY - 10, machine, 0.4, 1.4);
+        for (let i = 0; i < 22; i++) {
+          const bx = -M.bedW / 2 + 8 + (i / 22) * (M.bedW - 16);
+          seg(bx, plateY - 13, bx + 1.3, plateY - 13, cream, 0.22, 1);
+        }
+        /* [Other] Y limit switch at the end of travel */
+        rect(M.bedW / 2 - 8, plateY - 16, 7, 5, machine, 0.6, 0.18, 0.8);
+        /* [14] Y idler pulley at the far end of the belt loop */
+        circle(-M.bedW / 2 + 6, plateY - 11, 3.4, brass, 0.65, 0.2);
       }
 
       /* ============================================== X GANTRY + RAILS */
@@ -473,13 +581,33 @@ export function PrintCanvas({ className }: { className?: string }) {
           const bx = -M.postX + 5 + (i / 26) * (M.postX * 2 - 10);
           seg(bx, gantryY + 5.2, bx + 1.4, gantryY + 5.2, cream, 0.28, 1);
         }
-        /* motor block left, idler pulley right */
-        rect(-M.postX - 2, gantryY - 3, 12, 16, machine, 0.7, 0.2, 1);
-        circle(M.postX - 4, gantryY + 5, 5, machine, 0.7, 0.14);
+        /* [Other] X stepper motor, left end — body, shaft, mount bolts */
+        rect(-M.postX - 4, gantryY - 4, 16, 18, machine, 0.75, 0.22, 1.5);
+        circle(-M.postX + 4, gantryY + 5, 3.4, machine, 0.65, 0.18);
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2 + 0.7;
+          circle(-M.postX + 4 + Math.cos(a) * 5.6, gantryY + 5 + Math.sin(a) * 5.6, 1, machine, 0.5);
+        }
+        /* [8] Idler pulley + belt tensioner, right end */
+        circle(M.postX - 5, gantryY + 5, 5, brass, 0.7, 0.18);
+        circle(M.postX - 5, gantryY + 5, 1.8, machine, 0.6, 0.3);
+        seg(M.postX + 1, gantryY + 5, M.postX + 8, gantryY + 5, machine, 0.55, 1.4);
+        circle(M.postX + 9, gantryY + 5, 2, machine, 0.6, 0.2);
       }
 
       /* ======================================================= PRINT HEAD */
-      const headX = reduceMotion ? -20 : Math.sin((elapsed / 1000) * 2.4) * (M.bedW * 0.33);
+      /* The head traverses the CURRENT layer rather than a fixed arc, so it
+         stays over the part: a tight wiggle across the trunk, a wide sweep
+         across the canopy. A small floor keeps it visibly working even on the
+         narrowest layers. */
+      const layerMid = (layerMin + layerMax) / 2;
+      const layerAmp = Math.max((layerMax - layerMin) / 2, M.bedW * 0.05);
+      const sweep = reduceMotion ? -0.45 : Math.sin((elapsed / 1000) * 2.4);
+      const headX = layerMid + sweep * layerAmp;
+
+      /* Extruding only counts when the nozzle is over material — off the part
+         it's a travel move, and the bead should go cold. */
+      const overMaterial = liveSpans.some((s) => headX >= s.a - 1 && headX <= s.b + 1);
       /* carriage backplate */
       rect(headX - 17, gantryY - 30, 34, 32, machine, 0.9, 0.26, 2);
       /* fan shroud + radial grille */
@@ -499,15 +627,58 @@ export function PrintCanvas({ className }: { className?: string }) {
           );
         }
         circle(headX, gantryY - 15, 2.4, machine, 0.7, 0.3);
-        /* heatsink fins above the shroud */
-        for (let i = 0; i < 4; i++) {
-          seg(headX - 7, gantryY - 2 + i * 2.4, headX + 7, gantryY - 2 + i * 2.4, machine, 0.4);
+        /* [9] V-wheel rollers riding the X rail */
+        for (const o of [-11, 0, 11]) {
+          circle(headX + o, gantryY + 5, 2.6, machine, 0.65, 0.2);
         }
+        /* [7] Heatsink fins between the cold end and the heat block */
+        for (let i = 0; i < 5; i++) {
+          seg(headX - 8, gantryY - 30 + i * 1.9, headX + 8, gantryY - 30 + i * 1.9, machine, 0.45);
+        }
+        /* [Other] Toolhead cooling duct, angled down at the part */
+        ctx.beginPath();
+        ctx.moveTo(sx(headX - 13), sy(gantryY - 24));
+        ctx.lineTo(sx(headX - 17), sy(gantryY - 33));
+        ctx.lineTo(sx(headX - 10), sy(gantryY - 35));
+        ctx.lineTo(sx(headX - 7), sy(gantryY - 27));
+        ctx.closePath();
+        ctx.fillStyle = rgba(machine, 0.22);
+        ctx.fill();
+        ctx.strokeStyle = rgba(machine, 0.7);
+        ctx.lineWidth = lw(1.2);
+        ctx.stroke();
         /* warning label */
-        rect(headX + 6, gantryY - 25, 5, 5, foliage, 0.6, 0.2, 0.5);
+        rect(headX + 7, gantryY - 25, 5, 5, foliage, 0.6, 0.2, 0.5);
       }
-      /* hotend + nozzle taper */
+      /* [7] Heat block */
       rect(headX - 5, gantryY - 34, 10, 8, machine, 0.85, 0.35, 1);
+
+      if (detail) {
+        /* [6] Direct-drive extruder: stepper body bolted to the carriage,
+           with its drive gear at the filament path. Direct drive means the
+           motor rides ON the head — that's what makes it visible at all. */
+        rect(headX + 13, gantryY - 24, 16, 17, machine, 0.8, 0.24, 1.5);
+        circle(headX + 21, gantryY - 15.5, 4, brass, 0.7, 0.25);
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2 + 0.7;
+          circle(headX + 21 + Math.cos(a) * 6, gantryY - 15.5 + Math.sin(a) * 6, 1, machine, 0.45);
+        }
+        /* [21] Hotend cooling fan — separate from the part-cooling fan,
+           blowing across the heatsink to stop heat creep. */
+        circle(headX - 16, gantryY - 11, 4.5, machine, 0.75, 0.16);
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2 + 0.4;
+          seg(
+            headX - 16 + Math.cos(a) * 1.6,
+            gantryY - 11 + Math.sin(a) * 1.6,
+            headX - 16 + Math.cos(a) * 4.2,
+            gantryY - 11 + Math.sin(a) * 4.2,
+            machine,
+            0.5,
+            0.8,
+          );
+        }
+      }
       ctx.beginPath();
       ctx.moveTo(sx(headX - 5), sy(gantryY - 34));
       ctx.lineTo(sx(headX + 5), sy(gantryY - 34));
@@ -530,13 +701,13 @@ export function PrintCanvas({ className }: { className?: string }) {
 
       /* ============================================================ TREE */
       const treeBase = plateY + 6;
-      const cosS = Math.cos(spin);
-      const sinS = Math.sin(spin);
+      const beadWidth = Math.max(1.4, (M.printH / LAYERS) * unit * 1.3);
 
       for (let i = 0; i < built; i++) {
         const t = i / (LAYERS - 1);
         const y = treeBase + t * M.printH;
         const heat = Math.max(0, 1 - (built - i) / 7);
+        const isLive = i === built - 1;
 
         const slices = crossSections(t)
           .map((s) => ({
@@ -551,25 +722,52 @@ export function PrintCanvas({ className }: { className?: string }) {
           const color = mix(base, cream, heat * heat);
           const depth = 0.62 + 0.38 * ((s.rz + 0.4) / 0.8);
           const alpha = Math.min(1, (0.52 + 0.48 * heat) * depth);
-          const halfW = s.r * M.printH * 0.98;
-          ctx.beginPath();
-          ctx.moveTo(sx(s.rx * M.printH * 0.98 - halfW), sy(y));
-          ctx.lineTo(sx(s.rx * M.printH * 0.98 + halfW), sy(y));
-          ctx.strokeStyle = rgba(color, alpha);
+          const cx = s.rx * TREE_SCALE;
+          const halfW = s.r * TREE_SCALE;
+
           ctx.lineCap = "round";
-          ctx.lineWidth = Math.max(1.4, (M.printH / LAYERS) * unit * 1.3);
+          ctx.beginPath();
+          ctx.moveTo(sx(cx - halfW), sy(y));
+          ctx.lineTo(sx(cx + halfW), sy(y));
+          ctx.strokeStyle = rgba(color, alpha);
+          ctx.lineWidth = beadWidth;
           ctx.stroke();
+
+          /* The bead the nozzle is laying right now: a short hot segment of
+             the live layer directly under the tip. This is what visually ties
+             the head to the print — without it the layer just appears whole. */
+          if (isLive && overMaterial) {
+            const w = Math.max(3, TREE_SCALE * 0.045);
+            const a = Math.max(cx - halfW, headX - w);
+            const b = Math.min(cx + halfW, headX + w);
+            if (b > a) {
+              ctx.beginPath();
+              ctx.moveTo(sx(a), sy(y));
+              ctx.lineTo(sx(b), sy(y));
+              ctx.strokeStyle = rgba(cream, 0.95);
+              ctx.lineWidth = beadWidth * 1.15;
+              ctx.stroke();
+            }
+          }
         }
       }
       ctx.lineCap = "butt";
 
-      /* molten bead at the nozzle */
+      /* Molten bead at the nozzle. Hot and blooming while extruding; dim and
+         unlit on a travel move, which is the tell that the head is repositioning
+         rather than laying material. */
       ctx.save();
-      ctx.shadowBlur = 18;
+      ctx.shadowBlur = overMaterial ? 18 : 0;
       ctx.shadowColor = rgba(cream, 1);
-      ctx.fillStyle = rgba(cream, 1);
+      ctx.fillStyle = rgba(cream, overMaterial ? 1 : 0.4);
       ctx.beginPath();
-      ctx.arc(sx(headX), sy(gantryY - 43), Math.max(1.8, 2.4 * unit * 0.6), 0, Math.PI * 2);
+      ctx.arc(
+        sx(headX),
+        sy(gantryY - 43),
+        Math.max(1.8, 2.4 * unit * 0.6) * (overMaterial ? 1 : 0.7),
+        0,
+        Math.PI * 2,
+      );
       ctx.fill();
       ctx.restore();
 
@@ -597,18 +795,6 @@ export function PrintCanvas({ className }: { className?: string }) {
       ctx.strokeStyle = rgba(foliage, 0.5);
       ctx.lineWidth = lw(1.4);
       ctx.stroke();
-
-      /* ============================================ DIMENSION CALLOUTS ===
-         Only on wide layouts — below that there isn't room for them to read,
-         and half-legible measurements are worse than none. */
-      if (wide && detail) {
-        dimensionV(-M.baseW / 2 - 22, 0, M.frameTop + M.barH, "380mm", machine);
-        dimensionH(-26, -M.baseW / 2, M.baseW / 2, "360mm", machine);
-        /* build-volume callout on the printed part itself */
-        seg(M.bedW / 2 + 4, treeBase, M.bedW / 2 + 14, treeBase, machine, 0.3);
-        seg(M.bedW / 2 + 4, treeBase + M.printH, M.bedW / 2 + 14, treeBase + M.printH, machine, 0.3);
-        dimensionV(M.bedW / 2 + 26, treeBase, treeBase + M.printH, "190mm", machine);
-      }
 
       if (running && !reduceMotion) frame = requestAnimationFrame(draw);
     };
@@ -656,6 +842,9 @@ export function PrintCanvas({ className }: { className?: string }) {
       foliage = readRgb(next, "--accent-2", foliage);
       machine = readRgb(next, "--machine", machine);
       bark = readRgb(next, "--bark", bark);
+      brass = readRgb(next, "--brass", brass);
+      logoPaper = readRgb(next, "--logo-paper", logoPaper);
+      logoInk = readRgb(next, "--logo-ink", logoInk);
       draw(performance.now());
     });
     themeObserver.observe(document.documentElement, {

@@ -63,7 +63,7 @@ export function DashboardShell({
           <Link href="/" aria-label="DripLink home">
             {collapsed ? (
               <span className="grid size-8 place-items-center">
-                <Wordmark className="[&>span:last-child]:hidden" />
+                <Wordmark markOnly />
               </span>
             ) : (
               <Wordmark />
