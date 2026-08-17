@@ -2,6 +2,7 @@ import { Boxes, Layers, Printer, Smartphone, SlidersHorizontal, Sparkles } from 
 import { CinematicHero } from "@/components/marketing/cinematic-hero";
 import { CtaBand } from "@/components/marketing/cta-band";
 import { HowItWorks } from "@/components/marketing/how-it-works";
+import { IntroSequence } from "@/components/marketing/intro-sequence";
 import { LayerStack } from "@/components/marketing/layer-stack";
 import { Reveal } from "@/components/marketing/reveal";
 import { Ticker } from "@/components/marketing/ticker";
@@ -72,6 +73,8 @@ const steps = [
 export default function HomePage() {
   return (
     <div className="bg-void">
+      <IntroSequence />
+
       <div id="intro">
         <CinematicHero />
       </div>

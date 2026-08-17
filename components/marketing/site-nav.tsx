@@ -64,7 +64,7 @@ export function SiteNav() {
         className="mx-auto flex h-16 max-w-content items-center justify-between gap-6 px-6 lg:px-12"
       >
         <Link href="/" className="shrink-0" aria-label="DripLink home">
-          <Wordmark />
+          <Wordmark introTarget />
         </Link>
 
         <ul className="hidden items-center gap-8 md:flex">

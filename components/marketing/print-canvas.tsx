@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { INTRO, buildElapsedMs, introSeconds, setLogoAnchor } from "@/lib/intro";
 
 /**
  * The hero visual: the DripLink Core — a bed-slinger 3D printer drawn as a
@@ -48,6 +49,31 @@ const M = {
 
 /** Model units from the gantry beam's origin down to the nozzle tip. */
 const NOZZLE_DROP = 42;
+
+/* Assembly choreography.
+   Groups are ordered strictly BOTTOM-TO-TOP by the height they occupy, and
+   every part rises into place from below — the machine builds itself the same
+   way the print on it does.
+
+   MUST satisfy  STAGGER * (ORDERS - 1) + DUR <= INTRO.ASSEMBLE_END, or the
+   last part is still moving when printing starts.
+   Eight orders: 0.14 * 7 + 0.8 = 1.78s, inside the 1.8s budget. */
+const ASSEMBLY_STAGGER = 0.14;
+const ASSEMBLY_DUR = 0.8;
+
+const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+/**
+ * Smooth ease-out, no overshoot.
+ *
+ * An easeOutBack here made parts snap past their resting place and bounce
+ * back, which reads as jittery when eight of them overlap. A plain quartic
+ * decelerates continuously and settles clean.
+ */
+const easeOutSmooth = (p: number) => {
+  if (p <= 0) return 0;
+  if (p >= 1) return 1;
+  return 1 - (1 - p) ** 4;
+};
 
 /**
  * The DripLink monogram, as canvas paths.
@@ -297,7 +323,16 @@ export function PrintCanvas({ className }: { className?: string }) {
         if (running && !reduceMotion) frame = requestAnimationFrame(draw);
         return;
       }
-      const elapsed = reduceMotion ? BUILD_SECONDS * 1000 : now - startedAt;
+      /* Intro sequence: the machine assembles from scattered parts before any
+         printing starts. `introT` is Infinity whenever the intro isn't playing
+         (reduced motion, repeat visit, skipped), which makes every assembly
+         progress resolve to 1 and costs nothing in the steady state. */
+      const introT = reduceMotion ? Number.POSITIVE_INFINITY : introSeconds(now);
+      const assembling = introT < INTRO.ASSEMBLE_END;
+
+      const elapsed = reduceMotion
+        ? BUILD_SECONDS * 1000
+        : buildElapsedMs(now, now - startedAt);
       const cycle = BUILD_SECONDS + 3;
       const build = reduceMotion ? 1 : Math.min(1, ((elapsed / 1000) % cycle) / BUILD_SECONDS);
       const spin = reduceMotion
@@ -345,6 +380,49 @@ export function PrintCanvas({ className }: { className?: string }) {
         ? height * 0.5 + ((bbox.top + bbox.bottom) / 2) * unit
         : height * 0.985;
 
+      /* ---- assembly ------------------------------------------------------
+         Each subassembly flies in from its own direction, tumbling as it goes,
+         and locks into place. Staggered so the machine builds bottom-up: base,
+         then the uprights, the crossbar, the bed, and finally the moving parts.
+         When a group's progress hits 1 the transform is skipped entirely, so
+         the finished machine draws exactly as it did before. */
+      const gp = (order: number) => {
+        if (!Number.isFinite(introT)) return 1;
+        const start = order * ASSEMBLY_STAGGER;
+        return clamp01((introT - start) / ASSEMBLY_DUR);
+      };
+
+      const group = (
+        order: number,
+        pivotX: number,
+        pivotY: number,
+        dx: number,
+        dy: number,
+        rot: number,
+        body: () => void,
+      ) => {
+        const raw = gp(order);
+        /* Shortcut on RAW progress: once a part has landed it draws with no
+           transform at all, so the finished machine costs nothing. */
+        if (raw >= 1) {
+          body();
+          return;
+        }
+        if (raw <= 0) return;
+        const p = easeOutSmooth(raw);
+        ctx.save();
+        /* Fade in over the first third of the rise, then hold solid — a part
+           that is still translucent as it lands looks like a ghost. */
+        ctx.globalAlpha = clamp01(raw * 3);
+        const px = sx(pivotX);
+        const py = sy(pivotY);
+        ctx.translate(px + dx * (1 - p) * unit, py + dy * (1 - p) * unit);
+        ctx.rotate(rot * (1 - p));
+        ctx.translate(-px, -py);
+        body();
+        ctx.restore();
+      };
+
       const built = Math.floor(build * LAYERS);
       const printed = (built / LAYERS) * M.printH;
 
@@ -369,6 +447,7 @@ export function PrintCanvas({ className }: { className?: string }) {
       const detail = unit > 1.1; // only draw fine detail when it will read
 
       /* ==================================================== BASE + SCREEN */
+      group(0, 0, M.baseH / 2, 0, 90, 0, () => {
       rect(-M.baseW / 2, 0, M.baseW, M.baseH, machine, 0.8, 0.18, 3);
       /* upper lip */
       seg(-M.baseW / 2 + 3, M.baseH - 5, M.baseW / 2 - 3, M.baseH - 5, machine, 0.4);
@@ -449,24 +528,30 @@ export function PrintCanvas({ className }: { className?: string }) {
         }
       }
 
+      });
+
       /* ========================================================= UPRIGHTS */
+      /* Left and right swing in from their own sides. */
       for (const s of [-1, 1]) {
-        const x = s * M.postX - M.postW / 2;
-        rect(x, M.baseH, M.postW, M.frameTop - M.baseH, machine, 0.85, 0.16, 2);
-        if (detail) {
-          /* aluminium extrusion channels */
-          seg(x + M.postW * 0.32, M.baseH + 4, x + M.postW * 0.32, M.frameTop - 4, machine, 0.3);
-          seg(x + M.postW * 0.68, M.baseH + 4, x + M.postW * 0.68, M.frameTop - 4, machine, 0.3);
-          /* corner bolts */
-          circle(s * M.postX, M.baseH + 8, 2.2, machine, 0.5);
-          circle(s * M.postX, M.frameTop - 8, 2.2, machine, 0.5);
-        }
+        group(2, s * M.postX, (M.baseH + M.frameTop) / 2, 0, 120, 0, () => {
+          const x = s * M.postX - M.postW / 2;
+          rect(x, M.baseH, M.postW, M.frameTop - M.baseH, machine, 0.85, 0.16, 2);
+          if (detail) {
+            /* aluminium extrusion channels */
+            seg(x + M.postW * 0.32, M.baseH + 4, x + M.postW * 0.32, M.frameTop - 4, machine, 0.3);
+            seg(x + M.postW * 0.68, M.baseH + 4, x + M.postW * 0.68, M.frameTop - 4, machine, 0.3);
+            /* corner bolts */
+            circle(s * M.postX, M.baseH + 8, 2.2, machine, 0.5);
+            circle(s * M.postX, M.frameTop - 8, 2.2, machine, 0.5);
+          }
+        });
       }
 
       /* [10] Z-axis lead screw — brass, threaded, on the right upright, with
          its coupler and stepper at the foot. The left upright carries a plain
          smooth rod, which is how a single-Z bed-slinger is actually built. */
       const zx = M.postX;
+      group(3, zx, (M.baseH + M.frameTop) / 2, 0, 100, 0, () => {
       seg(zx, M.baseH + 10, zx, M.frameTop - 8, brass, 0.55, 2.6);
       if (detail) {
         /* thread — short diagonals up the rod */
@@ -480,8 +565,11 @@ export function PrintCanvas({ className }: { className?: string }) {
         rect(zx - 10, M.baseH - 16, 20, 18, machine, 0.75, 0.22, 1.5);
         circle(zx, M.baseH - 7, 4, machine, 0.6, 0.15);
       }
+      });
       /* smooth Z rod on the left */
-      seg(-M.postX, M.baseH + 8, -M.postX, M.frameTop - 8, cream, 0.2, 1.6);
+      group(3, -M.postX, (M.baseH + M.frameTop) / 2, 0, 100, 0, () => {
+        seg(-M.postX, M.baseH + 8, -M.postX, M.frameTop - 8, cream, 0.2, 1.6);
+      });
 
       if (detail) {
         /* [Other] Limit switches. Z homes at the bottom of its travel and X at
@@ -491,37 +579,87 @@ export function PrintCanvas({ className }: { className?: string }) {
       }
 
       /* ========================================================= CROSSBAR */
-      rect(-M.postX - M.postW / 2, M.frameTop, M.postX * 2 + M.postW, M.barH, machine, 0.85, 0.2, 2);
+      group(7, 0, M.frameTop + M.barH / 2, 0, 130, 0, () => {
+        rect(-M.postX - M.postW / 2, M.frameTop, M.postX * 2 + M.postW, M.barH, machine, 0.85, 0.2, 2);
+      });
       if (detail) {
         /* The real DripLink monogram, badged on the crossbar. Same path data
-           as the DOM logo, so the two can never drift apart. */
+           as the DOM logo, so the two can never drift apart.
+
+           During the intro this badge is choreographed: the mark slides in
+           from the right of frame, the wordmark wipes on after it, and then
+           the whole badge hands off to a DOM element that flies up to the nav.
+           `markGone` is the moment the canvas stops drawing it and the DOM
+           flyer takes over from the exact same screen position. */
         const markH = 11;
         const markW = (markH * 61) / 68;
         const barMidY = M.frameTop + M.barH / 2;
         const markX = -26;
 
-        ctx.save();
-        /* Path2D coordinates run y-down; translate to the mark's TOP edge and
-           scale into model units before filling. */
-        ctx.translate(sx(markX), sy(barMidY + markH / 2));
-        const ms = (markH * unit) / 68;
-        ctx.scale(ms, ms);
-        ctx.fillStyle = rgba(logoInk, 1);
-        ctx.fill(MARK_D, "evenodd");
-        ctx.fillStyle = rgba(logoPaper, 1);
-        ctx.fill(MARK_L);
-        ctx.restore();
+        const markIn = Number.isFinite(introT)
+          ? clamp01((introT - INTRO.ASSEMBLE_END) / (INTRO.MARK_IN_END - INTRO.ASSEMBLE_END))
+          : 1;
+        const wordIn = Number.isFinite(introT)
+          ? clamp01((introT - INTRO.MARK_IN_END) / (INTRO.WORD_IN_END - INTRO.MARK_IN_END))
+          : 1;
+        const markGone = Number.isFinite(introT) && introT >= INTRO.HOLD_END;
 
-        /* Wordmark beside it, split in the logo's two tones. */
-        const textX = markX + markW + 4;
-        label("Drip", textX, barMidY, 8, logoPaper, 1);
-        ctx.font = `${8 * unit}px ui-monospace, "SFMono-Regular", monospace`;
-        const dripW = ctx.measureText("Drip").width / unit;
-        label("Link", textX + dripW, barMidY, 8, logoInk, 1);
+        /* Publish where the badge sits, in viewport px, so the DOM flyer can
+           start exactly where the canvas left off. */
+        const canvasBox = canvas.getBoundingClientRect();
+        setLogoAnchor(
+          Number.isFinite(introT)
+            ? {
+                x: canvasBox.left + sx(markX),
+                y: canvasBox.top + sy(barMidY),
+                height: markH * unit,
+              }
+            : null,
+        );
+
+        if (!markGone && markIn > 0) {
+          const slide = (1 - easeOutSmooth(markIn)) * 260;
+
+          ctx.save();
+          ctx.globalAlpha = clamp01(markIn * 1.6);
+          /* Path2D coordinates run y-down; translate to the mark's TOP edge and
+             scale into model units before filling. */
+          ctx.translate(sx(markX) + slide * unit * 0.1, sy(barMidY + markH / 2));
+          const ms = (markH * unit) / 68;
+          ctx.scale(ms, ms);
+          ctx.fillStyle = rgba(logoInk, 1);
+          ctx.fill(MARK_D, "evenodd");
+          ctx.fillStyle = rgba(logoPaper, 1);
+          ctx.fill(MARK_L);
+          ctx.restore();
+
+          /* Wordmark beside it, split in the logo's two tones, wiped on
+             left-to-right so it reads as being written onto the machine. */
+          if (wordIn > 0) {
+            const textX = markX + markW + 4;
+            ctx.font = `${8 * unit}px ui-monospace, "SFMono-Regular", monospace`;
+            const dripW = ctx.measureText("Drip").width / unit;
+            const fullW = ctx.measureText("DripLink").width / unit;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(
+              sx(textX),
+              sy(barMidY + markH),
+              fullW * unit * wordIn,
+              markH * 2 * unit,
+            );
+            ctx.clip();
+            label("Drip", textX, barMidY, 8, logoPaper, 1);
+            label("Link", textX + dripW, barMidY, 8, logoInk, 1);
+            ctx.restore();
+          }
+        }
       }
 
       /* ============================================================== BED */
       const plateY = M.bedY;
+      group(1, 0, plateY, 0, 90, 0, () => {
       rect(-M.bedW / 2, plateY, M.bedW, 6, machine, 0.9, 0.3, 1);
       /* build surface grid — the only grid in the design, under the print */
       for (let i = 1; i < 12; i++) {
@@ -564,6 +702,8 @@ export function PrintCanvas({ className }: { className?: string }) {
         circle(-M.bedW / 2 + 6, plateY - 11, 3.4, brass, 0.65, 0.2);
       }
 
+      });
+
       /* ============================================== X GANTRY + RAILS */
       /* Derived from the layer being deposited, not a standalone offset.
          The two were computed independently before, which left the nozzle a
@@ -572,6 +712,7 @@ export function PrintCanvas({ className }: { className?: string }) {
          the nozzle drop makes the tip land exactly on the layer it's laying. */
       const topLayerY = M.bedY + 6 + printed;
       const gantryY = topLayerY + NOZZLE_DROP;
+      group(5, 0, gantryY, 0, 100, 0, () => {
       rect(-M.postX, gantryY, M.postX * 2, 10, machine, 0.9, 0.24, 1.5);
       if (detail) {
         /* twin linear rails and the belt run */
@@ -595,6 +736,8 @@ export function PrintCanvas({ className }: { className?: string }) {
         circle(M.postX + 9, gantryY + 5, 2, machine, 0.6, 0.2);
       }
 
+      });
+
       /* ======================================================= PRINT HEAD */
       /* The head traverses the CURRENT layer rather than a fixed arc, so it
          stays over the part: a tight wiggle across the trunk, a wide sweep
@@ -608,6 +751,7 @@ export function PrintCanvas({ className }: { className?: string }) {
       /* Extruding only counts when the nozzle is over material — off the part
          it's a travel move, and the bead should go cold. */
       const overMaterial = liveSpans.some((s) => headX >= s.a - 1 && headX <= s.b + 1);
+      group(6, headX, gantryY - 14, 0, 110, 0, () => {
       /* carriage backplate */
       rect(headX - 17, gantryY - 30, 34, 32, machine, 0.9, 0.26, 2);
       /* fan shroud + radial grille */
@@ -687,6 +831,8 @@ export function PrintCanvas({ className }: { className?: string }) {
       ctx.fillStyle = rgba(cream, 0.9);
       ctx.fill();
 
+      });
+
       /* ================================================== CABLE CHAIN */
       if (detail) {
         const links = 16;
@@ -703,7 +849,9 @@ export function PrintCanvas({ className }: { className?: string }) {
       const treeBase = plateY + 6;
       const beadWidth = Math.max(1.4, (M.printH / LAYERS) * unit * 1.3);
 
-      for (let i = 0; i < built; i++) {
+      /* Nothing prints until the machine exists. */
+      const treeLayers = assembling ? 0 : built;
+      for (let i = 0; i < treeLayers; i++) {
         const t = i / (LAYERS - 1);
         const y = treeBase + t * M.printH;
         const heat = Math.max(0, 1 - (built - i) / 7);
@@ -772,6 +920,7 @@ export function PrintCanvas({ className }: { className?: string }) {
       ctx.restore();
 
       /* ================================================ SPOOL (side arm) */
+      group(4, M.spool.x, M.spool.y, 0, 90, 0, () => {
       /* mounting arm off the right upright */
       rect(M.postX, M.spool.y - 4, M.spool.x - M.postX - 8, 8, machine, 0.7, 0.2, 1);
       circle(M.spool.x, M.spool.y, M.spool.r, machine, 0.85, 0.1, 1.8);
@@ -795,6 +944,7 @@ export function PrintCanvas({ className }: { className?: string }) {
       ctx.strokeStyle = rgba(foliage, 0.5);
       ctx.lineWidth = lw(1.4);
       ctx.stroke();
+      });
 
       if (running && !reduceMotion) frame = requestAnimationFrame(draw);
     };

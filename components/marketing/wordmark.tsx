@@ -40,15 +40,26 @@ export function Wordmark({
   className,
   /** Monogram only — for the collapsed dashboard sidebar. */
   markOnly = false,
+  /**
+   * Marks this instance as the intro's landing pad. Exactly one Wordmark on a
+   * page should set it (the nav's) — the footer and auth copies must not, or
+   * the flying badge could measure the wrong one and the intro would hide
+   * logos it never animates.
+   */
+  introTarget = false,
 }: {
   className?: string;
   markOnly?: boolean;
+  introTarget?: boolean;
 }) {
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
-      <DripLinkMark className={markOnly ? "h-7" : "h-6"} />
+      <span {...(introTarget ? { "data-logo-target": "" } : {})} className="inline-flex">
+        <DripLinkMark className={markOnly ? "h-7" : "h-6"} />
+      </span>
       {markOnly ? null : (
         <span
+          {...(introTarget ? { "data-logo-word": "" } : {})}
           className="font-display text-base font-semibold tracking-tight"
           style={{ color: "var(--logo-paper)" }}
         >

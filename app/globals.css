@@ -487,6 +487,59 @@
       0 1px 2px rgb(0 0 0 / 0.15);
   }
 
+  /* ==========================================================================
+     Intro sequence
+     --------------------------------------------------------------------------
+     `data-intro` on <html> is written by IntroSequence. It is only ever
+     "running" when the animation is genuinely playing — reduced motion and
+     repeat visits set "done" before first paint, so nothing below applies and
+     the page renders exactly as it otherwise would.
+
+     The nav logo is held back while the badge is still on the machine, then
+     fades up as the flyer lands on it. The wordmark trails the mark slightly
+     so the text reads as arriving after the symbol.
+     ========================================================================== */
+  /* Transitions, not keyframes. The RESTING declared state is visible, and
+     only the transient "running" rule hides these — so no animation has to
+     complete for the logo to exist. A keyframe with a from-state of opacity 0
+     strands the mark permanently if it never ticks; this cannot. */
+  [data-logo-target] {
+    transition:
+      opacity 420ms cubic-bezier(0.16, 1, 0.3, 1),
+      transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  [data-logo-word] {
+    transition:
+      opacity 460ms cubic-bezier(0.16, 1, 0.3, 1) 120ms,
+      transform 460ms cubic-bezier(0.16, 1, 0.3, 1) 120ms,
+      clip-path 520ms cubic-bezier(0.16, 1, 0.3, 1) 120ms;
+  }
+
+  [data-intro="running"] [data-logo-target] {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+
+  [data-intro="running"] [data-logo-word] {
+    opacity: 0;
+    transform: translateX(-6px);
+    clip-path: inset(0 100% 0 0);
+  }
+
+  /* The rest of the page holds still until the machine has assembled, so the
+     intro isn't competing with content fading in behind it. Scoped to
+     "running" only, so if JS never sets the attribute nothing is hidden. */
+  [data-intro="running"] main > *:not(:first-child),
+  [data-intro="running"] footer {
+    opacity: 0;
+  }
+
+  main > *,
+  footer {
+    transition: opacity 500ms ease 60ms;
+  }
+
   .scrollbar-none {
     scrollbar-width: none;
   }
