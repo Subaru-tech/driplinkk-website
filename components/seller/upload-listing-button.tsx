@@ -83,7 +83,7 @@ export function UploadListingButton() {
     const session = sessionData.session;
     if (!session) {
       toast("error", "Your session expired. Log in again.");
-      router.push("/login?role=seller");
+      router.push("/login");
       return;
     }
 

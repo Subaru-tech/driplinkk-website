@@ -1,9 +1,12 @@
 import "server-only";
 
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { LISTING_SORTS, type Category, type ListingSort } from "@/lib/marketplace";
 import type {
   LedgerEntry,
+  LibraryItem,
   Listing,
+  PublicListing,
   MartOrder,
   Model,
   Payout,
@@ -185,20 +188,35 @@ export async function getSellerProfile(): Promise<QueryResult<SellerProfile | nu
   return { data: (data as SellerProfile) ?? null, backendReady: true };
 }
 
+/** Every column the seller's own views need. The public browse deliberately
+    asks for less — see `PUBLIC_LISTING_COLUMNS`. */
+const LISTING_COLUMNS =
+  "id, title, slug, description, category, tags, license, price_inr, status, " +
+  "thumbnail_url, file_path, file_bytes, downloads, purchases, published_at, created_at";
+
+/* No file_path here: the storage path of the mesh is the one thing a public
+   page must never hand out. Buyers get a signed URL after a purchase. */
+const PUBLIC_LISTING_COLUMNS =
+  "id, title, slug, description, category, tags, license, price_inr, " +
+  "thumbnail_url, downloads, purchases, published_at, created_at, " +
+  "seller:seller_profiles(studio_name, slug)";
+
 export async function getListings(limit?: number): Promise<QueryResult<Listing[]>> {
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty([]);
 
   let query = supabase
     .from("listings")
-    .select("id, title, slug, price_inr, status, thumbnail_url, downloads, created_at")
+    .select(LISTING_COLUMNS)
     .order("created_at", { ascending: false });
 
   if (limit) query = query.limit(limit);
 
   const { data, error } = await query;
   if (error) return empty([]);
-  return { data: (data as Listing[]) ?? [], backendReady: true };
+  /* The column list is a const, not a literal, so PostgREST's generic can't
+     infer the row shape — the cast is doing what the literal would. */
+  return { data: (data as unknown as Listing[]) ?? [], backendReady: true };
 }
 
 export async function getPublishedListingCount(): Promise<QueryResult<number>> {
@@ -259,4 +277,128 @@ export async function getPayouts(limit?: number): Promise<QueryResult<Payout[]>>
   const { data, error } = await query;
   if (error) return empty([]);
   return { data: (data as Payout[]) ?? [], backendReady: true };
+}
+
+/** One of the seller's own listings, for the editor. */
+export async function getSellerListing(id: string): Promise<QueryResult<Listing | null>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty(null);
+
+  const { data, error } = await supabase
+    .from("listings")
+    .select(LISTING_COLUMNS)
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) return empty(null);
+  return { data: (data as unknown as Listing) ?? null, backendReady: true };
+}
+
+/* ---------------------------------------------------------- Public browse
+   These run for signed-out visitors too. The RLS policy on `listings` allows
+   anyone to read rows with status 'published', so no service key and no
+   separate public API are involved — the database is the filter. */
+
+export async function getPublicListings(
+  options: { category?: Category; search?: string; sort?: ListingSort; limit?: number } = {},
+): Promise<QueryResult<PublicListing[]>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty([]);
+
+  const sort = LISTING_SORTS[options.sort ?? "newest"];
+
+  let query = supabase
+    .from("listings")
+    .select(PUBLIC_LISTING_COLUMNS)
+    .eq("status", "published")
+    .order(sort.column, { ascending: sort.ascending, nullsFirst: false });
+
+  if (options.category) query = query.eq("category", options.category);
+  if (options.search) {
+    const escaped = options.search.replace(/[%_]/g, (char) => `\\${char}`);
+    /* Title, description and tags — the listing editor tells sellers their
+       tags are used for search, so they have to actually be searched. */
+    query = query.or(
+      `title.ilike.%${escaped}%,description.ilike.%${escaped}%,tags.cs.{${escaped.toLowerCase()}}`,
+    );
+  }
+  if (options.limit) query = query.limit(options.limit);
+
+  const { data, error } = await query;
+  if (error) return empty([]);
+  return { data: (data as unknown as PublicListing[]) ?? [], backendReady: true };
+}
+
+export async function getPublicListing(slug: string): Promise<QueryResult<PublicListing | null>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty(null);
+
+  const { data, error } = await supabase
+    .from("listings")
+    .select(PUBLIC_LISTING_COLUMNS)
+    .eq("slug", slug)
+    .eq("status", "published")
+    .maybeSingle();
+
+  if (error) return empty(null);
+  return { data: (data as unknown as PublicListing) ?? null, backendReady: true };
+}
+
+/** Category counts for the browse sidebar. One row per published listing is
+    cheap here; when this stops being cheap it becomes a database view. */
+export async function getCategoryCounts(): Promise<QueryResult<Record<string, number>>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty({});
+
+  const { data, error } = await supabase
+    .from("listings")
+    .select("category")
+    .eq("status", "published");
+
+  if (error) return empty({});
+
+  const counts: Record<string, number> = {};
+  for (const row of (data as { category: string | null }[]) ?? []) {
+    if (row.category) counts[row.category] = (counts[row.category] ?? 0) + 1;
+  }
+  return { data: counts, backendReady: true };
+}
+
+/* ------------------------------------------------------------- Library
+   What the signed-in user has access to. The file path comes back here — it
+   has to, so the library can mint a signed download URL — and the storage
+   policy is what actually decides whether that URL works. */
+
+export async function getLibrary(): Promise<QueryResult<LibraryItem[]>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty([]);
+
+  const { data, error } = await supabase
+    .from("library_items")
+    .select(
+      "id, listing_id, source, acquired_at, " +
+        "listing:listings(id, title, slug, thumbnail_url, file_path, license, " +
+        "seller:seller_profiles(studio_name))",
+    )
+    .order("acquired_at", { ascending: false });
+
+  if (error) return empty([]);
+  return { data: (data as unknown as LibraryItem[]) ?? [], backendReady: true };
+}
+
+/** Whether the current user already has this listing. Null when signed out. */
+export async function getLibraryEntry(listingId: string): Promise<string | null> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return null;
+
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return null;
+
+  const { data } = await supabase
+    .from("library_items")
+    .select("id")
+    .eq("listing_id", listingId)
+    .maybeSingle();
+
+  return (data as { id: string } | null)?.id ?? null;
 }

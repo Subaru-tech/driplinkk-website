@@ -17,22 +17,19 @@ a banner says so explicitly, and auth is inert. No sample data is ever substitut
 
 ## Two kinds of account
 
-Logging in starts with a popup: **Creator** or **Seller**.
+One account. Everyone signs up the same way; selling is opted into later.
 
 | | Creator | Seller |
 | --- | --- | --- |
 | Who | Uses LeaFF OS / the app, generates models, orders prints | Uploads models to sell on the Mart |
 | Lands on | `/dashboard` | `/seller` |
-| Extra sign-up field | — | Studio name |
+| Becomes real | at sign-up | when they open a storefront at `/seller` |
 
-Credentials are the same for both: **email + password**. The role picked in the popup is a
-route hint, not a credential — it is written to the URL (`/login?role=seller`) so the choice
-survives a reload, and after the password succeeds the server reads the account's real role
-from `profiles.role` and routes on that. Picking the wrong door gets a "wrong door" card,
-never access.
-
-The whole role vocabulary lives in `lib/roles.ts`; the popup, the sign-up fields and both
-layout guards render from it.
+Credentials are **email + password**, nothing else. Nobody is asked which side they're on:
+the server reads `profiles.role` after the password succeeds and routes to `/dashboard` or
+`/seller`. `/dashboard` has no role check at all — a seller is also a customer, with a
+library and orders of their own. `/seller` has no gate either; an account without a
+storefront is simply offered one.
 
 ## Backend
 
@@ -45,19 +42,22 @@ service-role key never appears here. See that folder's `README.md` for deploymen
 
 ```
 app/
-  (marketing)/     Home, LeaFF OS, Mart, App, About, Contact, Terms, Privacy
+  (marketing)/     Home, LeaFF OS, Models (marketplace), Mart, App, About, Contact, Terms, Privacy
+                   models/[slug]  public model page — buy or send to Mart
   (auth)/          Login, Signup, Password reset, actions.ts (role resolution)
-  dashboard/       Creator shell + Overview, Models, Mart Orders, Billing, Account
+  dashboard/       Creator shell + Overview, Models, Library, Mart Orders, Billing, Account
   seller/          Seller shell + Overview, Listings, Sales, Payouts, Account
+                   listings/[id]  listing editor + publish flow
   actions.ts       Server actions for the waitlist + contact forms
 components/
   ui/              Button, Card, Input, Modal, Toast, StatusPill, EmptyState, Skeleton, Spinner
   marketing/       Nav, Footer, Hero, PillarCard, HowItWorks, WaitlistForm, CtaBand, …
-  auth/            AuthCard, LoginForm, SignupForm, RoleDialog, PasswordRequirements
-  seller/          ListingRow
+  auth/            AuthCard, LoginForm, SignupForm, PasswordRequirements
+  seller/          ListingRow, ListingEditor, StartSelling, UploadListingButton
   dashboard/       Shell, StatCard, ModelCard, OrderRow, LedgerTable, CreditBuyModal, …
 lib/
   roles.ts           The two account types and where each one lands
+  marketplace.ts     Categories, licences, sorts, publish blockers
   account.ts         Server-side role read (profiles.role is authoritative)
   supabase.ts        Browser client + config (single source of truth for env)
   supabase-server.ts Server client (cookie-bound) + getCurrentUser
@@ -133,6 +133,7 @@ Tables the UI already queries (see `lib/types.ts` for exact fields):
 | `profiles` (incl. `role`) | credit chip, Overview, Billing, Account, both layout guards |
 | `seller_profiles` | seller shell, storefront, payouts |
 | `listings` / `sales` / `payouts` | seller Overview, Listings, Sales, Payouts |
+| `library_items` | My Library, and the storage policy that authorises downloads |
 | `models` | Overview, My Models |
 | `mart_orders` | Overview, Mart Orders, order detail |
 | `credit_ledger` | Billing ledger (paginated, 20/page) |

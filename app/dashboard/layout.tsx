@@ -3,8 +3,7 @@ import { redirect } from "next/navigation";
 import { AccountMenu } from "@/components/dashboard/account-menu";
 import { CreditChip } from "@/components/dashboard/credit-chip";
 import { DashboardShell, SIDEBAR_COOKIE } from "@/components/dashboard/dashboard-shell";
-import { getAccountRole } from "@/lib/account";
-import { getProfile } from "@/lib/queries";
+import { getProfile, getSellerProfile } from "@/lib/queries";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { getCurrentUser } from "@/lib/supabase-server";
 
@@ -26,12 +25,18 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
      the env vars are set, this is a hard guard. */
   if (isSupabaseConfigured && !user) redirect("/login");
 
-  /* Sellers have their own half of the product. Only a role read straight from
-     `profiles` is trusted to bounce someone — see `lib/account.ts`. */
-  const account = await getAccountRole();
-  if (account?.source === "profile" && account.role === "seller") redirect("/seller");
+  /* No role bounce here, on purpose.
+     A seller is also a customer: they buy models, order prints and keep a
+     library like anyone else. Sending them to /seller the moment they open a
+     creator page would lock them out of their own library. The seller area is
+     the restricted one (it needs a storefront); this side is for everybody.
+     Role only decides where login LANDS you — see `app/(auth)/actions.ts`. */
 
-  const [{ data: profile }, cookieStore] = await Promise.all([getProfile(), cookies()]);
+  const [{ data: profile }, { data: seller }, cookieStore] = await Promise.all([
+    getProfile(),
+    getSellerProfile(),
+    cookies(),
+  ]);
 
   return (
     <DashboardShell
@@ -42,6 +47,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           email={user?.email ?? null}
           name={profile?.full_name ?? (user?.user_metadata?.full_name as string | undefined) ?? null}
           avatarUrl={profile?.avatar_url ?? null}
+          isSeller={Boolean(seller)}
         />
       }
     >

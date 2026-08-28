@@ -15,6 +15,7 @@ import { cn } from "@/lib/cn";
 
 const links = [
   { href: "/leaff-os", label: "LeaFF OS" },
+  { href: "/models", label: "Models" },
   { href: "/mart", label: "Mart" },
   { href: "/app", label: "App" },
   { href: "/about", label: "About" },

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { StatusPill, type StatusTone } from "@/components/ui/status-pill";
 import type { Listing, ListingStatus } from "@/lib/types";
@@ -24,7 +25,10 @@ export function ListingStatusPill({ status }: { status: ListingStatus }) {
 
 export function ListingRow({ listing }: { listing: Listing }) {
   return (
-    <div className="flex flex-wrap items-center gap-4 border-b border-line px-1 py-3 last:border-b-0">
+    <Link
+      href={`/seller/listings/${listing.id}`}
+      className="flex flex-wrap items-center gap-4 rounded-[var(--radius-control)] border-b border-line px-1 py-3 transition-colors last:border-b-0 hover:bg-raised"
+    >
       <span className="min-w-0 flex-1 truncate text-sm text-fg">{listing.title}</span>
       <ListingStatusPill status={listing.status} />
       <span className="font-mono text-sm text-fg">{formatCurrency(listing.price_inr)}</span>
@@ -32,6 +36,6 @@ export function ListingRow({ listing }: { listing: Listing }) {
         {listing.downloads} sold
       </span>
       <span className="w-28 text-right text-xs text-muted">{formatDate(listing.created_at)}</span>
-    </div>
+    </Link>
   );
 }

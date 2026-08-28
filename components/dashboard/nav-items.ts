@@ -2,6 +2,7 @@ import {
   Boxes,
   CreditCard,
   LayoutDashboard,
+  LibraryBig,
   Package,
   ReceiptIndianRupee,
   Store,
@@ -11,7 +12,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-/** Spec §5 — Overview / My Models / Mart Orders / Billing / Account. */
+/** Spec §5 — Overview / My Models / Mart Orders / Billing / Account, plus My
+    Library once the marketplace existed. Six items is the ceiling for the
+    mobile tab bar: at 320px each gets ~53px, so `shortLabel` has to stay short
+    (hence "Home" rather than "Overview"). A seventh needs a different pattern. */
 export type NavItem = {
   href: string;
   label: string;
@@ -21,8 +25,9 @@ export type NavItem = {
 };
 
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "Overview", shortLabel: "Overview", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Overview", shortLabel: "Home", icon: LayoutDashboard },
   { href: "/dashboard/models", label: "My Models", shortLabel: "Models", icon: Boxes },
+  { href: "/dashboard/library", label: "My Library", shortLabel: "Library", icon: LibraryBig },
   { href: "/dashboard/mart-orders", label: "Mart Orders", shortLabel: "Orders", icon: Truck },
   { href: "/dashboard/billing", label: "Credits & Billing", shortLabel: "Billing", icon: CreditCard },
   { href: "/dashboard/account", label: "Account", shortLabel: "Account", icon: UserCog },

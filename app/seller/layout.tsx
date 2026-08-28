@@ -2,10 +2,10 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AccountMenu } from "@/components/dashboard/account-menu";
 import { DashboardShell, SIDEBAR_COOKIE } from "@/components/dashboard/dashboard-shell";
-import { getAccountRole } from "@/lib/account";
 import { getProfile, getSellerProfile } from "@/lib/queries";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { getCurrentUser } from "@/lib/supabase-server";
+import { StartSelling } from "@/components/seller/start-selling";
 import { StatusPill } from "@/components/ui/status-pill";
 
 /** Same reasoning as the creator dashboard: never prerender, never cache. */
@@ -14,21 +14,17 @@ export const dynamic = "force-dynamic";
 /**
  * The seller half of the product. Same shell as /dashboard, different doors.
  *
- * Two guards: a session, and the right kind of account. A creator who lands
- * here is sent to their own dashboard rather than shown an empty seller view —
- * but only when the role came from `profiles`. Bouncing someone between two
- * dashboards on the strength of a stale JWT claim would be worse than letting
- * them through to a page whose queries return nothing anyway.
+ * There is no role gate here any more, because there is nothing to gate: an
+ * account without a storefront gets offered one. That's the whole onboarding —
+ * arriving at /seller IS the intent to sell, so asking at signup was asking
+ * three screens too early.
  */
 export default async function SellerLayout({ children }: LayoutProps<"/seller">) {
   const user = await getCurrentUser();
 
-  if (isSupabaseConfigured && !user) redirect("/login?role=seller");
+  if (isSupabaseConfigured && !user) redirect("/login");
 
-  const account = await getAccountRole();
-  if (account?.source === "profile" && account.role !== "seller") redirect("/dashboard");
-
-  const [{ data: profile }, { data: seller }, cookieStore] = await Promise.all([
+  const [{ data: profile }, { data: seller, backendReady }, cookieStore] = await Promise.all([
     getProfile(),
     getSellerProfile(),
     cookies(),
@@ -55,10 +51,15 @@ export default async function SellerLayout({ children }: LayoutProps<"/seller">)
             null
           }
           avatarUrl={profile?.avatar_url ?? null}
+          isSeller={Boolean(seller)}
         />
       }
     >
-      {children}
+      {/* No storefront yet: the whole area is the sign-up for one. Rendered
+          inside the shell so it doesn't feel like being bounced somewhere.
+          `backendReady` matters: a failed query must not offer onboarding to
+          someone who already has a storefront. */}
+      {seller || !backendReady ? children : <StartSelling />}
     </DashboardShell>
   );
 }

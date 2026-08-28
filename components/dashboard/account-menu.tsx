@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, UserCog } from "lucide-react";
+import { LogOut, Store, UserCog } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -11,10 +11,14 @@ export function AccountMenu({
   email,
   name,
   avatarUrl,
+  /* The seller side is opt-in, so the menu says either "go to it" or
+     "start one" — the only two states an account can be in. */
+  isSeller = false,
 }: {
   email: string | null;
   name: string | null;
   avatarUrl: string | null;
+  isSeller?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -82,6 +86,16 @@ export function AccountMenu({
           >
             <UserCog className="size-4" aria-hidden="true" />
             Account settings
+          </Link>
+
+          <Link
+            href="/seller"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 px-4 py-2.5 text-sm text-muted transition-colors hover:bg-raised hover:text-fg"
+          >
+            <Store className="size-4" aria-hidden="true" />
+            {isSeller ? "Seller studio" : "Start selling"}
           </Link>
 
           <button

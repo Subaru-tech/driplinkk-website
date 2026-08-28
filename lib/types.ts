@@ -73,11 +73,26 @@ export type Listing = {
   id: string;
   title: string;
   slug: string;
+  description: string | null;
+  category: string | null;
+  tags: string[];
+  license: string;
   price_inr: number;
   status: ListingStatus;
   thumbnail_url: string | null;
+  file_path: string | null;
+  file_bytes: number | null;
   downloads: number;
+  purchases: number;
+  published_at: string | null;
   created_at: string;
+};
+
+/** A published listing as the public marketplace sees it: the listing plus
+    the storefront it belongs to. The mesh path is deliberately absent — the
+    file is the thing being sold. */
+export type PublicListing = Omit<Listing, "file_path" | "file_bytes" | "status"> & {
+  seller: { studio_name: string; slug: string } | null;
 };
 
 export type Sale = {
@@ -98,4 +113,21 @@ export type Payout = {
   reference: string | null;
   created_at: string;
   paid_at: string | null;
+};
+
+/** A model the user has access to — free claim now, purchase later. */
+export type LibraryItem = {
+  id: string;
+  listing_id: string;
+  source: "free" | "purchase" | "gift";
+  acquired_at: string;
+  listing: {
+    id: string;
+    title: string;
+    slug: string;
+    thumbnail_url: string | null;
+    file_path: string | null;
+    license: string;
+    seller: { studio_name: string } | null;
+  } | null;
 };

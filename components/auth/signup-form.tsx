@@ -8,65 +8,42 @@ import {
   PasswordRequirements,
   passwordIsValid,
 } from "@/components/auth/password-requirements";
-import { RoleBadge, RoleDialog } from "@/components/auth/role-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Field, Input, PasswordInput } from "@/components/ui/input";
-import { homeForRole, ROLES, type UserRole } from "@/lib/roles";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/* Step 0 is the same popup as login, but here the choice is real: it decides
-   which rows the backend provisions (a seller also gets a `seller_profiles`
-   row, keyed on the studio name asked for below). */
+/* One kind of account. Selling is something you start later, from inside the
+   product, at the point you actually want to — not a fork you're asked to
+   resolve before you've seen anything. */
 
-export function SignupForm({ initialRole }: { initialRole: UserRole | null }) {
+export function SignupForm() {
   const router = useRouter();
 
-  const [role, setRole] = useState<UserRole | null>(initialRole);
   const [name, setName] = useState("");
-  const [studioName, setStudioName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [errors, setErrors] = useState<{
-    name?: string;
-    studioName?: string;
-    email?: string;
-    password?: string;
-  }>({});
+  const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string }>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmSent, setConfirmSent] = useState(false);
   const [pending, setPending] = useState(false);
 
   /* Spec §4.1 — the terms checkbox gates the submit button. */
-  const canSubmit = acceptedTerms && role !== null && !pending;
-
-  function chooseRole(next: UserRole) {
-    setRole(next);
-    setFormError(null);
-    router.replace(`/signup?role=${next}`, { scroll: false });
-  }
-
-  function validateStudioName(value: string) {
-    if (role !== "seller") return undefined;
-    return value.trim().length >= 2 ? undefined : "Enter the name buyers will see.";
-  }
+  const canSubmit = acceptedTerms && !pending;
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setFormError(null);
 
-    if (!role) return;
-
     const nextErrors = {
       name: name.trim() ? undefined : "Enter your name.",
-      studioName: validateStudioName(studioName),
       email: EMAIL_RE.test(email) ? undefined : "Enter a valid email address.",
       password: passwordIsValid(password) ? undefined : "Password doesn't meet the requirements.",
     };
     setErrors(nextErrors);
-    if (nextErrors.name || nextErrors.studioName || nextErrors.email || nextErrors.password) return;
+    if (nextErrors.name || nextErrors.email || nextErrors.password) return;
 
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
@@ -79,15 +56,8 @@ export function SignupForm({ initialRole }: { initialRole: UserRole | null }) {
       email,
       password,
       options: {
-        /* This metadata is client-supplied, so the backend's
-           `handle_new_user()` trigger re-validates it — anything that isn't
-           exactly "seller" provisions a creator. */
-        data: {
-          full_name: name.trim(),
-          role,
-          ...(role === "seller" ? { studio_name: studioName.trim() } : {}),
-        },
-        emailRedirectTo: `${window.location.origin}${homeForRole(role)}`,
+        data: { full_name: name.trim() },
+        emailRedirectTo: `${window.location.origin}/dashboard`,
       },
     });
     setPending(false);
@@ -104,7 +74,7 @@ export function SignupForm({ initialRole }: { initialRole: UserRole | null }) {
       return;
     }
 
-    router.push(homeForRole(role));
+    router.push("/dashboard");
     router.refresh();
   }
 
@@ -123,23 +93,13 @@ export function SignupForm({ initialRole }: { initialRole: UserRole | null }) {
   }
 
   return (
-    <>
-      <RoleDialog
-        open={role === null}
-        mode="signup"
-        onSelect={chooseRole}
-        onClose={() => router.push("/")}
-      />
-
-      <AuthCard
-        title="Create your account"
-        subtitle={role ? ROLES[role].blurb : "Start building with DripLink."}
-        error={formError}
-        footer={{ prompt: "Already have an account?", href: "/login", label: "Log in" }}
-      >
+    <AuthCard
+      title="Create your account"
+      subtitle="Start building with DripLink."
+      error={formError}
+      footer={{ prompt: "Already have an account?", href: "/login", label: "Log in" }}
+    >
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
-        {role ? <RoleBadge role={role} onChange={() => setRole(null)} /> : null}
-
         <Field label="Name" error={errors.name}>
           {({ id, describedBy, invalid }) => (
             <Input
@@ -156,31 +116,6 @@ export function SignupForm({ initialRole }: { initialRole: UserRole | null }) {
             />
           )}
         </Field>
-
-        {/* Sellers get one extra field: the name buyers see on the Mart. The
-            backend turns it into their storefront slug. */}
-        {role === "seller" ? (
-          <Field
-            label="Studio name"
-            error={errors.studioName}
-            hint="Shown on every listing you publish."
-          >
-            {({ id, describedBy, invalid }) => (
-              <Input
-                id={id}
-                name="studio-name"
-                autoComplete="organization"
-                value={studioName}
-                onChange={(e) => setStudioName(e.target.value)}
-                onBlur={() =>
-                  setErrors((s) => ({ ...s, studioName: validateStudioName(studioName) }))
-                }
-                aria-describedby={describedBy}
-                invalid={invalid}
-              />
-            )}
-          </Field>
-        ) : null}
 
         <Field label="Email" error={errors.email}>
           {({ id, describedBy, invalid }) => (
@@ -250,7 +185,6 @@ export function SignupForm({ initialRole }: { initialRole: UserRole | null }) {
           Create account
         </Button>
       </form>
-      </AuthCard>
-    </>
+    </AuthCard>
   );
 }
