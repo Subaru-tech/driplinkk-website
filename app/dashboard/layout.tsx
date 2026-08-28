@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AccountMenu } from "@/components/dashboard/account-menu";
 import { CreditChip } from "@/components/dashboard/credit-chip";
 import { DashboardShell, SIDEBAR_COOKIE } from "@/components/dashboard/dashboard-shell";
+import { getAccountRole } from "@/lib/account";
 import { getProfile } from "@/lib/queries";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { getCurrentUser } from "@/lib/supabase-server";
@@ -24,6 +25,11 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
      instead of bouncing every visitor to a login form that cannot work. Once
      the env vars are set, this is a hard guard. */
   if (isSupabaseConfigured && !user) redirect("/login");
+
+  /* Sellers have their own half of the product. Only a role read straight from
+     `profiles` is trusted to bounce someone — see `lib/account.ts`. */
+  const account = await getAccountRole();
+  if (account?.source === "profile" && account.role === "seller") redirect("/seller");
 
   const [{ data: profile }, cookieStore] = await Promise.all([getProfile(), cookies()]);
 

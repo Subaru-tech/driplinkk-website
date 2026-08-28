@@ -4,7 +4,7 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { NAV_ITEMS, titleForPath } from "@/components/dashboard/nav-items";
+import { NAV_ITEMS, SELLER_NAV_ITEMS, titleForPath } from "@/components/dashboard/nav-items";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
 import { Wordmark } from "@/components/marketing/wordmark";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -23,13 +23,21 @@ export function DashboardShell({
   defaultCollapsed,
   creditChip,
   accountMenu,
+  /* The seller area (/seller/*) reuses this shell with its own doors. The
+     nav is selected by name, not passed in: the items carry Lucide icon
+     components, which cannot cross the server → client boundary. */
+  area = "creator",
   children,
 }: {
   defaultCollapsed: boolean;
   creditChip: ReactNode;
   accountMenu: ReactNode;
+  area?: "creator" | "seller";
   children: ReactNode;
 }) {
+  const navItems = area === "seller" ? SELLER_NAV_ITEMS : NAV_ITEMS;
+  const rootHref = area === "seller" ? "/seller" : "/dashboard";
+
   const pathname = usePathname();
 
   /* The collapsed state is persisted in a cookie rather than localStorage so
@@ -72,10 +80,10 @@ export function DashboardShell({
         </div>
 
         <nav aria-label="Dashboard" className="flex flex-1 flex-col gap-1 p-3">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const active =
               pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
+              (item.href !== rootHref && pathname.startsWith(`${item.href}/`));
 
             return (
               <Link
@@ -125,7 +133,7 @@ export function DashboardShell({
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-line bg-canvas/90 px-4 backdrop-blur-md md:px-8">
           <h1 className="truncate font-display text-base font-medium text-fg">
-            {titleForPath(pathname)}
+            {titleForPath(pathname, navItems)}
           </h1>
           <div className="flex shrink-0 items-center gap-2">
             {creditChip}
@@ -145,10 +153,10 @@ export function DashboardShell({
         aria-label="Dashboard"
         className="fixed inset-x-0 bottom-0 z-40 flex border-t border-line bg-canvas/95 backdrop-blur-md lg:hidden"
       >
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const active =
             pathname === item.href ||
-            (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
+            (item.href !== rootHref && pathname.startsWith(`${item.href}/`));
 
           return (
             <Link

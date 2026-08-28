@@ -1,12 +1,14 @@
 "use client";
 
-import { Box, Download, ExternalLink, MoreVertical, Trash2 } from "lucide-react";
+import { Box, Download, ExternalLink, Eye, MoreVertical, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { ModelViewer } from "@/components/viewer/model-viewer";
 import { useToast } from "@/components/ui/toast";
 import { formatCredits, formatDate } from "@/lib/format";
+import { canPreview } from "@/lib/model-preview";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import type { Model } from "@/lib/types";
 import { cn } from "@/lib/cn";
@@ -21,6 +23,8 @@ export function ModelCard({ model }: { model: Model }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -54,6 +58,34 @@ export function ModelCard({ model }: { model: Model }) {
     router.refresh();
   }
 
+  /* The file lives in a PRIVATE bucket, so the viewer can't be handed a plain
+     URL — it gets a short-lived signed one, minted per preview. */
+  const viewable = Boolean(model.storage_path && canPreview(model.storage_path));
+
+  async function openPreview() {
+    const path = model.storage_path;
+    if (!path) return;
+
+    setPreviewError(null);
+    setPreviewUrl("pending");
+
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setPreviewError("Preview isn't available — the backend isn't connected.");
+      return;
+    }
+
+    const { data, error } = await supabase.storage
+      .from("model-files")
+      .createSignedUrl(path, 300);
+
+    if (error || !data) {
+      setPreviewError("Couldn't open that file. It may have been removed.");
+      return;
+    }
+    setPreviewUrl(data.signedUrl);
+  }
+
   const actions = [
     { icon: ExternalLink, label: "Open in App", href: `leaffos://open?model=${model.id}` },
     { icon: Download, label: "Download", href: `leaffos://download?model=${model.id}` },
@@ -81,6 +113,17 @@ export function ModelCard({ model }: { model: Model }) {
 
           {/* Hover overlay — pointer devices only. */}
           <div className="pointer-events-none absolute inset-0 hidden items-center justify-center gap-2 bg-black/70 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 lg:flex">
+            {viewable ? (
+              <button
+                type="button"
+                onClick={openPreview}
+                title="Preview in 3D"
+                aria-label={`Preview ${model.name} in 3D`}
+                className="grid size-9 place-items-center rounded-[var(--radius-control)] bg-surface text-fg transition-colors hover:bg-raised"
+              >
+                <Eye className="size-4" aria-hidden="true" />
+              </button>
+            ) : null}
             {actions.map((action) => (
               <a
                 key={action.label}
@@ -133,6 +176,20 @@ export function ModelCard({ model }: { model: Model }) {
                 role="menu"
                 className="absolute right-0 z-30 mt-1 w-44 animate-fade-in overflow-hidden rounded-[var(--radius-control)] border border-line bg-surface shadow-xl shadow-black/30"
               >
+                {viewable ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void openPreview();
+                    }}
+                    className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-muted transition-colors hover:bg-raised hover:text-fg"
+                  >
+                    <Eye className="size-4" aria-hidden="true" />
+                    Preview in 3D
+                  </button>
+                ) : null}
                 {actions.map((action) => (
                   <a
                     key={action.label}
@@ -162,6 +219,29 @@ export function ModelCard({ model }: { model: Model }) {
           </div>
         </div>
       </div>
+
+      <Modal
+        open={previewUrl !== null}
+        onClose={() => {
+          setPreviewUrl(null);
+          setPreviewError(null);
+        }}
+        title={model.name}
+        description={previewError ?? "Rendered in your browser from the uploaded file."}
+        className="max-w-[720px]"
+      >
+        {previewError ? null : previewUrl && previewUrl !== "pending" ? (
+          <ModelViewer
+            url={previewUrl}
+            filename={model.storage_path ?? model.name}
+            className="aspect-4/3 w-full"
+          />
+        ) : (
+          <div className="grid aspect-4/3 w-full place-items-center rounded-[var(--radius-card)] border border-line bg-raised">
+            <span className="text-sm text-muted">Preparing preview…</span>
+          </div>
+        )}
+      </Modal>
 
       {/* Spec §6.2 — confirm modal, danger button, and the copy says plainly
           that there is no undo. */}

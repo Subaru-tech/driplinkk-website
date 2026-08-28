@@ -1,7 +1,16 @@
 import "server-only";
 
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import type { LedgerEntry, MartOrder, Model, Profile } from "@/lib/types";
+import type {
+  LedgerEntry,
+  Listing,
+  MartOrder,
+  Model,
+  Payout,
+  Profile,
+  Sale,
+  SellerProfile,
+} from "@/lib/types";
 
 /**
  * Dashboard data access.
@@ -63,7 +72,7 @@ export async function getModels(
 
   let query = supabase
     .from("models")
-    .select("id, name, thumbnail_url, credits_spent, created_at")
+    .select("id, name, thumbnail_url, storage_path, credits_spent, created_at")
     .order(sort.column, { ascending: sort.ascending });
 
   if (options.search) {
@@ -153,4 +162,101 @@ export async function getModelCount(): Promise<QueryResult<number>> {
 
   if (error) return empty(0);
   return { data: count ?? 0, backendReady: true };
+}
+
+/* ------------------------------------------------------------- Seller side
+   Same rule as above: real queries from day one, empty results and a real
+   empty state until the schema is deployed. */
+
+export async function getSellerProfile(): Promise<QueryResult<SellerProfile | null>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty(null);
+
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return empty(null);
+
+  const { data, error } = await supabase
+    .from("seller_profiles")
+    .select("id, studio_name, slug, bio, payout_status")
+    .eq("id", auth.user.id)
+    .maybeSingle();
+
+  if (error) return empty(null);
+  return { data: (data as SellerProfile) ?? null, backendReady: true };
+}
+
+export async function getListings(limit?: number): Promise<QueryResult<Listing[]>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty([]);
+
+  let query = supabase
+    .from("listings")
+    .select("id, title, slug, price_inr, status, thumbnail_url, downloads, created_at")
+    .order("created_at", { ascending: false });
+
+  if (limit) query = query.limit(limit);
+
+  const { data, error } = await query;
+  if (error) return empty([]);
+  return { data: (data as Listing[]) ?? [], backendReady: true };
+}
+
+export async function getPublishedListingCount(): Promise<QueryResult<number>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty(0);
+
+  const { count, error } = await supabase
+    .from("listings")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "published");
+
+  if (error) return empty(0);
+  return { data: count ?? 0, backendReady: true };
+}
+
+export async function getSales(limit?: number): Promise<QueryResult<Sale[]>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty([]);
+
+  let query = supabase
+    .from("sales")
+    .select("id, listing_id, gross_inr, platform_fee_inr, net_inr, created_at")
+    .order("created_at", { ascending: false });
+
+  if (limit) query = query.limit(limit);
+
+  const { data, error } = await query;
+  if (error) return empty([]);
+  return { data: (data as Sale[]) ?? [], backendReady: true };
+}
+
+/** Lifetime net earnings, in rupees. */
+export async function getSellerEarnings(): Promise<QueryResult<number>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty(0);
+
+  const { data, error } = await supabase.from("sales").select("net_inr");
+  if (error) return empty(0);
+
+  const total = ((data as { net_inr: number }[]) ?? []).reduce(
+    (sum, row) => sum + row.net_inr,
+    0,
+  );
+  return { data: total, backendReady: true };
+}
+
+export async function getPayouts(limit?: number): Promise<QueryResult<Payout[]>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty([]);
+
+  let query = supabase
+    .from("payouts")
+    .select("id, amount_inr, state, reference, created_at, paid_at")
+    .order("created_at", { ascending: false });
+
+  if (limit) query = query.limit(limit);
+
+  const { data, error } = await query;
+  if (error) return empty([]);
+  return { data: (data as Payout[]) ?? [], backendReady: true };
 }

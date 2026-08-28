@@ -29,6 +29,22 @@ export function ThemeScript() {
    * Note this does NOT cascade: suppressHydrationWarning applies only to the
    * element it's set on, so the one on <html> in layout.tsx does not cover
    * this script.
+   *
+   * The `type` switch is the fix Next's "preventing flash before hydration"
+   * guide prescribes: React warns in development whenever a render produces a
+   * <script> tag, because a script inserted by a client render never executes.
+   * That warning is correct in general and irrelevant here — this script has
+   * already run during HTML parsing, long before React touches it. Marking the
+   * client-side copy `text/plain` makes that explicit: on the server it is real
+   * JavaScript the browser runs before first paint, and on the client it is
+   * inert text React can render without warning. `suppressHydrationWarning`
+   * covers the resulting type mismatch.
    */
-  return <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: script }} />;
+  return (
+    <script
+      type={typeof window === "undefined" ? "text/javascript" : "text/plain"}
+      suppressHydrationWarning
+      dangerouslySetInnerHTML={{ __html: script }}
+    />
+  );
 }

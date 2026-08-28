@@ -15,20 +15,50 @@ runs in "backend not connected" mode**: every dashboard panel renders its real e
 a banner says so explicitly, and auth is inert. No sample data is ever substituted — see
 "The no-fabricated-data rule" below.
 
+## Two kinds of account
+
+Logging in starts with a popup: **Creator** or **Seller**.
+
+| | Creator | Seller |
+| --- | --- | --- |
+| Who | Uses LeaFF OS / the app, generates models, orders prints | Uploads models to sell on the Mart |
+| Lands on | `/dashboard` | `/seller` |
+| Extra sign-up field | — | Studio name |
+
+Credentials are the same for both: **email + password**. The role picked in the popup is a
+route hint, not a credential — it is written to the URL (`/login?role=seller`) so the choice
+survives a reload, and after the password succeeds the server reads the account's real role
+from `profiles.role` and routes on that. Picking the wrong door gets a "wrong door" card,
+never access.
+
+The whole role vocabulary lives in `lib/roles.ts`; the popup, the sign-up fields and both
+layout guards render from it.
+
+## Backend
+
+Schema, RLS, storage buckets and the sign-up role trigger live in a **separate folder**,
+`../driplinkk-backend`. Nothing but the two public keys is kept in this repo — the
+service-role key never appears here. See that folder's `README.md` for deployment and
+`docs/auth-flow.md` for how the two-role login is enforced server-side.
+
 ## Layout
 
 ```
 app/
   (marketing)/     Home, LeaFF OS, Mart, App, About, Contact, Terms, Privacy
-  (auth)/          Login, Signup, Password reset
-  dashboard/       Shell + Overview, Models, Mart Orders, Billing, Account
+  (auth)/          Login, Signup, Password reset, actions.ts (role resolution)
+  dashboard/       Creator shell + Overview, Models, Mart Orders, Billing, Account
+  seller/          Seller shell + Overview, Listings, Sales, Payouts, Account
   actions.ts       Server actions for the waitlist + contact forms
 components/
   ui/              Button, Card, Input, Modal, Toast, StatusPill, EmptyState, Skeleton, Spinner
   marketing/       Nav, Footer, Hero, PillarCard, HowItWorks, WaitlistForm, CtaBand, …
-  auth/            AuthCard, LoginForm, SignupForm, PasswordRequirements
+  auth/            AuthCard, LoginForm, SignupForm, RoleDialog, PasswordRequirements
+  seller/          ListingRow
   dashboard/       Shell, StatCard, ModelCard, OrderRow, LedgerTable, CreditBuyModal, …
 lib/
+  roles.ts           The two account types and where each one lands
+  account.ts         Server-side role read (profiles.role is authoritative)
   supabase.ts        Browser client + config (single source of truth for env)
   supabase-server.ts Server client (cookie-bound) + getCurrentUser
   queries.ts         All dashboard reads
@@ -100,7 +130,9 @@ Tables the UI already queries (see `lib/types.ts` for exact fields):
 
 | Table | Used by |
 | --- | --- |
-| `profiles` | credit chip, Overview, Billing, Account |
+| `profiles` (incl. `role`) | credit chip, Overview, Billing, Account, both layout guards |
+| `seller_profiles` | seller shell, storefront, payouts |
+| `listings` / `sales` / `payouts` | seller Overview, Listings, Sales, Payouts |
 | `models` | Overview, My Models |
 | `mart_orders` | Overview, Mart Orders, order detail |
 | `credit_ledger` | Billing ledger (paginated, 20/page) |

@@ -1,4 +1,15 @@
-import { Boxes, CreditCard, LayoutDashboard, Truck, UserCog, type LucideIcon } from "lucide-react";
+import {
+  Boxes,
+  CreditCard,
+  LayoutDashboard,
+  Package,
+  ReceiptIndianRupee,
+  Store,
+  Truck,
+  UserCog,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
 
 /** Spec §5 — Overview / My Models / Mart Orders / Billing / Account. */
 export type NavItem = {
@@ -17,9 +28,18 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/account", label: "Account", shortLabel: "Account", icon: UserCog },
 ];
 
+/** The seller side of the house — /seller/*. Same shell, different doors. */
+export const SELLER_NAV_ITEMS: NavItem[] = [
+  { href: "/seller", label: "Overview", shortLabel: "Overview", icon: Store },
+  { href: "/seller/listings", label: "My Listings", shortLabel: "Listings", icon: Package },
+  { href: "/seller/sales", label: "Sales", shortLabel: "Sales", icon: ReceiptIndianRupee },
+  { href: "/seller/payouts", label: "Payouts", shortLabel: "Payouts", icon: Wallet },
+  { href: "/seller/account", label: "Account", shortLabel: "Account", icon: UserCog },
+];
+
 /** Page title shown in the top bar. Longest match wins. */
-export function titleForPath(pathname: string): string {
-  const match = [...NAV_ITEMS]
+export function titleForPath(pathname: string, items: NavItem[] = NAV_ITEMS): string {
+  const match = [...items]
     .sort((a, b) => b.href.length - a.href.length)
     .find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
   return match?.label ?? "Dashboard";

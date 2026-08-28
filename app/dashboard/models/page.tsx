@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { BackendNotice } from "@/components/dashboard/backend-notice";
 import { ModelCard, ModelCardSkeleton } from "@/components/dashboard/model-card";
 import { ModelsToolbar } from "@/components/dashboard/models-toolbar";
+import { UploadModelButton } from "@/components/dashboard/upload-model-button";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonGroup } from "@/components/ui/skeleton";
@@ -37,9 +38,14 @@ async function ModelGrid({ search, sort }: { search?: string; sort?: ModelSort }
             size="lg"
             message="You haven't created any models yet"
             action={
-              <ButtonLink href="leaffos://new" prefetch={false}>
-                Open LeaFF OS
-              </ButtonLink>
+              /* Two ways in, because there are two: model it in the desktop
+                 app, or upload a file you already have. */
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <UploadModelButton />
+                <ButtonLink href="leaffos://new" variant="secondary" prefetch={false}>
+                  Open LeaFF OS
+                </ButtonLink>
+              </div>
             }
           />
         )}
@@ -77,9 +83,12 @@ export default async function ModelsPage({ searchParams }: PageProps<"/dashboard
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="font-display text-xl font-semibold text-fg">My Models</h2>
-        <Suspense>
-          <ModelsToolbar />
-        </Suspense>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Suspense>
+            <ModelsToolbar />
+          </Suspense>
+          <UploadModelButton />
+        </div>
       </div>
 
       <Suspense key={`${search ?? ""}-${sort ?? ""}`} fallback={<ModelGridSkeleton />}>

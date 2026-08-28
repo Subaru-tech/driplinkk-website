@@ -19,6 +19,9 @@ export type Model = {
   id: string;
   name: string;
   thumbnail_url: string | null;
+  /** Path inside the private `model-files` bucket. Null for models made in
+      the desktop app before browser upload existed. */
+  storage_path: string | null;
   credits_spent: number;
   created_at: string;
 };
@@ -51,4 +54,48 @@ export type SessionRecord = {
   device: string;
   last_active_at: string;
   is_current: boolean;
+};
+
+/* ------------------------------------------------------------- Seller side */
+
+export type SellerProfile = {
+  id: string;
+  studio_name: string;
+  slug: string;
+  bio: string | null;
+  /** unverified until payout details are confirmed with the provider. */
+  payout_status: "unverified" | "pending" | "verified" | "rejected";
+};
+
+export type ListingStatus = "draft" | "in_review" | "published" | "rejected" | "archived";
+
+export type Listing = {
+  id: string;
+  title: string;
+  slug: string;
+  price_inr: number;
+  status: ListingStatus;
+  thumbnail_url: string | null;
+  downloads: number;
+  created_at: string;
+};
+
+export type Sale = {
+  id: string;
+  listing_id: string;
+  gross_inr: number;
+  platform_fee_inr: number;
+  net_inr: number;
+  created_at: string;
+};
+
+export type PayoutState = "scheduled" | "processing" | "paid" | "failed";
+
+export type Payout = {
+  id: string;
+  amount_inr: number;
+  state: PayoutState;
+  reference: string | null;
+  created_at: string;
+  paid_at: string | null;
 };

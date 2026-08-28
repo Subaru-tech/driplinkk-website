@@ -12,7 +12,22 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  */
 
 export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-export const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+
+/**
+ * The public API key.
+ *
+ * Supabase renamed this: new projects issue a `sb_publishable_…` key and call
+ * it PUBLISHABLE, older ones issue a JWT and call it ANON. Both are read here
+ * so a project of either vintage works, publishable first.
+ *
+ * Either way it is safe in the browser bundle — RLS is what protects the data,
+ * not the secrecy of this string. The service-role key is a different thing
+ * entirely and never appears in this repo.
+ */
+export const SUPABASE_ANON_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+  "";
 
 /**
  * True once a real Supabase project is wired up (Track 2).
