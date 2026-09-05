@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { SignInButton } from "@clerk/nextjs";
+import { useSignIn, useSignUp } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
@@ -46,22 +46,75 @@ interface GoogleButtonProps {
 }
 
 function ClerkGoogleButton({
+  onError,
   text = "Continue with Google",
   disabled = false,
 }: GoogleButtonProps) {
+  const { signIn, fetchStatus: signInStatus } = useSignIn();
+  const { signUp, fetchStatus: signUpStatus } = useSignUp();
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleGoogleAuth() {
+    setSubmitting(true);
+    const isSignUp = text.toLowerCase().includes("sign up");
+
+    try {
+      if (isSignUp) {
+        const { error } = await signUp.sso({
+          strategy: "oauth_google",
+          redirectUrl: "/dashboard",
+          redirectCallbackUrl: "/sso-callback",
+        });
+        if (error) {
+          const { error: signInErr } = await signIn.sso({
+            strategy: "oauth_google",
+            redirectUrl: "/dashboard",
+            redirectCallbackUrl: "/sso-callback",
+          });
+          if (signInErr) {
+            setSubmitting(false);
+            onError(signInErr.message || error.message || "Failed to authenticate with Google.");
+          }
+        }
+      } else {
+        const { error } = await signIn.sso({
+          strategy: "oauth_google",
+          redirectUrl: "/dashboard",
+          redirectCallbackUrl: "/sso-callback",
+        });
+        if (error) {
+          const { error: signUpErr } = await signUp.sso({
+            strategy: "oauth_google",
+            redirectUrl: "/dashboard",
+            redirectCallbackUrl: "/sso-callback",
+          });
+          if (signUpErr) {
+            setSubmitting(false);
+            onError(signUpErr.message || error.message || "Failed to authenticate with Google.");
+          }
+        }
+      }
+    } catch (err: unknown) {
+      setSubmitting(false);
+      onError(err instanceof Error ? err.message : "Failed to connect to Google authentication.");
+    }
+  }
+
+  const isPending = submitting || signInStatus === "fetching" || signUpStatus === "fetching";
+
   return (
-    <SignInButton fallbackRedirectUrl="/dashboard" forceRedirectUrl="/dashboard">
-      <Button
-        type="button"
-        variant="secondary"
-        size="lg"
-        disabled={disabled}
-        className="w-full border-line-control hover:bg-raised"
-      >
-        <GoogleIcon className="size-4 shrink-0" />
-        <span>{text}</span>
-      </Button>
-    </SignInButton>
+    <Button
+      type="button"
+      variant="secondary"
+      size="lg"
+      loading={isPending}
+      disabled={disabled || isPending}
+      onClick={handleGoogleAuth}
+      className="w-full border-line-control hover:bg-raised"
+    >
+      <GoogleIcon className="size-4 shrink-0" />
+      <span>{text}</span>
+    </Button>
   );
 }
 
