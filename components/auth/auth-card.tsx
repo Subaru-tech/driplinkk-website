@@ -38,6 +38,9 @@ export function AuthCard({
         </div>
 
         <div className="mt-6">{children}</div>
+
+        {/* Clerk bot sign-up protection mount point */}
+        <div id="clerk-captcha" className="empty:hidden mt-4 flex justify-center" />
       </div>
 
       <p className="mt-6 text-center text-sm text-muted">

@@ -8,6 +8,7 @@ export default function SSOCallbackPage() {
         signUpForceRedirectUrl="/dashboard"
         signInForceRedirectUrl="/dashboard"
       />
+      <div id="clerk-captcha" className="empty:hidden" />
     </div>
   );
 }
