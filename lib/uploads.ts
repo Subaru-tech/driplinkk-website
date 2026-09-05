@@ -32,11 +32,11 @@ export const ACCEPTED_EXTENSIONS = {
 export const ACCEPT_ATTRIBUTE = Object.keys(ACCEPTED_EXTENSIONS).join(",");
 
 /**
- * 50 MB — the Supabase free plan's global per-file ceiling. Raising the
- * `model-files` bucket limit alone does nothing; the project-wide limit
- * (Dashboard → Storage → Settings) has to move first, on a paid plan.
+ * 500 MB — make sure the Supabase project-wide per-file limit matches
+ * (Dashboard → Storage → Settings). On the free plan this is capped at
+ * 50 MB; you need a paid plan for larger uploads.
  */
-export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+export const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
 
 export function extensionOf(filename: string): string {
   const dot = filename.lastIndexOf(".");
