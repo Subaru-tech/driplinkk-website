@@ -8,14 +8,19 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { renderThumbnail } from "@/lib/model-preview";
-import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { getSupabaseBrowserClient, SUPABASE_URL } from "@/lib/supabase";
 import {
   nameFromFilename,
   rowErrorMessage,
+  slugify,
   storagePathFor,
   uploadToStorage,
 } from "@/lib/uploads";
-import { getUploadSession, recordUploadedModel } from "@/lib/actions/upload-actions";
+import {
+  getUploadSession,
+  recordUploadedModel,
+  updateModelThumbnail,
+} from "@/lib/actions/upload-actions";
 
 /**
  * Upload existing model files from the browser — no desktop app needed.
@@ -37,7 +42,7 @@ type ProgressEntry = { percent: number; error: string | null };
  * failure — every one of them is cosmetic.
  */
 export async function attachThumbnail(
-  supabase: NonNullable<ReturnType<typeof getSupabaseBrowserClient>>,
+  accessToken: string,
   {
     file,
     userId,
@@ -45,22 +50,26 @@ export async function attachThumbnail(
     id,
   }: { file: File; userId: string; table: "models" | "listings"; id: string },
 ): Promise<boolean> {
-  const blob = await renderThumbnail(file);
-  if (!blob) return false;
+  try {
+    const blob = await renderThumbnail(file);
+    if (!blob) return false;
 
-  const path = `${userId}/${table}-${id}.png`;
-  const { error: uploadError } = await supabase.storage
-    .from("model-art")
-    .upload(path, blob, { contentType: "image/png", upsert: true });
-  if (uploadError) return false;
+    const path = `${userId}/${table}-${id}.png`;
+    const thumbFile = new File([blob], `${table}-${id}.png`, { type: "image/png" });
+    await uploadToStorage({
+      bucket: "model-art",
+      path,
+      file: thumbFile,
+      accessToken,
+    });
 
-  const { data } = supabase.storage.from("model-art").getPublicUrl(path);
-  const { error } = await supabase
-    .from(table)
-    .update({ thumbnail_url: data.publicUrl })
-    .eq("id", id);
-
-  return !error;
+    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/model-art/${path}`;
+    const res = await updateModelThumbnail({ id, thumbnailUrl: publicUrl });
+    return res.success;
+  } catch (err) {
+    console.warn("attachThumbnail failed:", err);
+    return false;
+  }
 }
 
 export function UploadModelButton({ variant = "primary" }: { variant?: "primary" | "secondary" }) {
@@ -113,6 +122,27 @@ export function UploadModelButton({ variant = "primary" }: { variant?: "primary"
       const path = storagePathFor(session.userId, picked.file.name);
 
       try {
+        // 1. Pre-render 3D thumbnail so the model card has its render immediately
+        let thumbnailUrl: string | null = null;
+        try {
+          const thumbBlob = await renderThumbnail(picked.file);
+          if (thumbBlob) {
+            const thumbPath = `${session.userId}/models-${Date.now()}-${slugify(nameFromFilename(picked.file.name))}.png`;
+            const thumbFile = new File([thumbBlob], "thumb.png", { type: "image/png" });
+            await uploadToStorage({
+              bucket: "model-art",
+              path: thumbPath,
+              file: thumbFile,
+              accessToken: session.accessToken,
+              signal: controller.signal,
+            });
+            thumbnailUrl = `${SUPABASE_URL}/storage/v1/object/public/model-art/${thumbPath}`;
+          }
+        } catch (thumbErr) {
+          console.warn("Pre-render thumbnail failed:", thumbErr);
+        }
+
+        // 2. Upload main model file
         await uploadToStorage({
           bucket: "model-files",
           path,
@@ -123,9 +153,11 @@ export function UploadModelButton({ variant = "primary" }: { variant?: "primary"
             setProgress((current) => ({ ...current, [picked.id]: { percent, error: null } })),
         });
 
+        // 3. Record model with thumbnail URL
         const { data: row, error } = await recordUploadedModel({
           name: nameFromFilename(picked.file.name),
           storagePath: path,
+          thumbnailUrl,
         });
 
         if (error || !row) {
@@ -138,12 +170,9 @@ export function UploadModelButton({ variant = "primary" }: { variant?: "primary"
 
         succeeded += 1;
 
-        /* Thumbnail last, and deliberately outside the failure path: the model
-           is already saved, so a browser that can't do WebGL loses a picture,
-           not an upload. The card falls back to its icon. */
-        const supabase = getSupabaseBrowserClient();
-        if (supabase && row?.id) {
-          void attachThumbnail(supabase, {
+        // Fallback: if pre-render didn't attach a thumbnail, attempt post-upload attach
+        if (!thumbnailUrl && row?.id) {
+          void attachThumbnail(session.accessToken, {
             file: picked.file,
             userId: session.userId,
             table: "models",

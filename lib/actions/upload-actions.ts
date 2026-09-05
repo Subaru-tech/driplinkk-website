@@ -83,6 +83,40 @@ export async function recordUploadedModel({
 }
 
 /**
+ * Updates an existing model's thumbnail URL.
+ */
+export async function updateModelThumbnail({
+  id,
+  thumbnailUrl,
+}: {
+  id: string;
+  thumbnailUrl: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const user = await getUnifiedUser();
+  if (!user) {
+    return { success: false, error: "Not authenticated" };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) {
+    return { success: false, error: "Backend database not connected." };
+  }
+
+  const { error } = await supabase
+    .from("models")
+    .update({ thumbnail_url: thumbnailUrl })
+    .eq("id", id)
+    .eq("owner_id", user.id);
+
+  if (error) {
+    console.error("Failed to update thumbnail:", error);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
+}
+
+/**
  * Records an uploaded listing in the marketplace linked to the verified seller.
  */
 export async function recordUploadedListing({

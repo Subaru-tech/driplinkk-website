@@ -121,9 +121,8 @@ export function UploadListingButton() {
         throw new Error(error || "Failed to create listing.");
       }
 
-      const supabase = getSupabaseBrowserClient();
-      if (supabase && row.id) {
-        void attachThumbnail(supabase, {
+      if (row.id) {
+        void attachThumbnail(session.accessToken, {
           file,
           userId: session.userId,
           table: "listings",

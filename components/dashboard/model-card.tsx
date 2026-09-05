@@ -227,13 +227,15 @@ export function ModelCard({ model }: { model: Model }) {
           setPreviewError(null);
         }}
         title={model.name}
-        description={previewError ?? "Rendered in your browser from the uploaded file."}
-        className="max-w-[720px]"
+        description={previewError ?? "Interactive 3D view · drag to orbit, scroll to zoom"}
+        className="max-w-[800px]"
       >
         {previewError ? null : previewUrl && previewUrl !== "pending" ? (
           <ModelViewer
             url={previewUrl}
             filename={model.storage_path ?? model.name}
+            modelId={model.id}
+            hasThumbnail={Boolean(model.thumbnail_url)}
             className="aspect-4/3 w-full"
           />
         ) : (
