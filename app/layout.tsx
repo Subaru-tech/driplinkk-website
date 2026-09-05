@@ -37,7 +37,9 @@ export const metadata: Metadata = {
 const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
-  const page = (
+  const content = <ToastProvider>{children}</ToastProvider>;
+
+  return (
     <html
       lang="en"
       data-theme="dark"
@@ -48,15 +50,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ThemeScript />
       </head>
       <body className="flex min-h-full flex-col bg-canvas text-fg">
-        <ToastProvider>{children}</ToastProvider>
+        {clerkPublishableKey ? (
+          <ClerkProvider publishableKey={clerkPublishableKey}>
+            {content}
+          </ClerkProvider>
+        ) : (
+          content
+        )}
       </body>
     </html>
   );
-
-  if (clerkPublishableKey) {
-    return <ClerkProvider publishableKey={clerkPublishableKey}>{page}</ClerkProvider>;
-  }
-
-  return page;
 }
 

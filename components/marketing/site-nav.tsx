@@ -4,10 +4,13 @@ import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
 import { ButtonLink } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Wordmark } from "@/components/marketing/wordmark";
 import { cn } from "@/lib/cn";
+
+const isClerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
 /* Spec §3.1.1 — sticky nav, bg-primary at 90% + blur once scrolled.
    Logo left, links centre, Log In / Sign Up right.
@@ -90,16 +93,52 @@ export function SiteNav() {
 
         <div className="hidden items-center gap-2 md:flex">
           <ThemeToggle />
-          <ButtonLink href="/login" variant="ghost" size="sm">
-            Log In
-          </ButtonLink>
-          <ButtonLink href="/signup" variant="primary" size="sm">
-            Sign Up
-          </ButtonLink>
+          {isClerkEnabled ? (
+            <>
+              <Show when="signed-out">
+                <SignInButton mode="modal">
+                  <button
+                    type="button"
+                    className="inline-flex h-8 items-center justify-center rounded-[var(--radius-control)] px-3 text-xs font-medium text-muted transition-colors hover:bg-raised hover:text-fg"
+                  >
+                    Log In
+                  </button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <button
+                    type="button"
+                    className="inline-flex h-8 items-center justify-center rounded-[var(--radius-control)] bg-accent px-3 text-xs font-medium text-white transition-opacity hover:opacity-90"
+                  >
+                    Sign Up
+                  </button>
+                </SignUpButton>
+              </Show>
+              <Show when="signed-in">
+                <ButtonLink href="/dashboard" variant="ghost" size="sm">
+                  Dashboard
+                </ButtonLink>
+                <UserButton />
+              </Show>
+            </>
+          ) : (
+            <>
+              <ButtonLink href="/login" variant="ghost" size="sm">
+                Log In
+              </ButtonLink>
+              <ButtonLink href="/signup" variant="primary" size="sm">
+                Sign Up
+              </ButtonLink>
+            </>
+          )}
         </div>
 
-        <div className="flex items-center gap-1 md:hidden">
+        <div className="flex items-center gap-2 md:hidden">
           <ThemeToggle />
+          {isClerkEnabled ? (
+            <Show when="signed-in">
+              <UserButton />
+            </Show>
+          ) : null}
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
@@ -144,24 +183,63 @@ export function SiteNav() {
           </ul>
 
           <div className="mt-8 flex flex-col gap-3 px-6">
-            <ButtonLink
-              href="/login"
-              variant="secondary"
-              size="lg"
-              className="w-full"
-              onClick={closeMenu}
-            >
-              Log In
-            </ButtonLink>
-            <ButtonLink
-              href="/signup"
-              variant="primary"
-              size="lg"
-              className="w-full"
-              onClick={closeMenu}
-            >
-              Sign Up
-            </ButtonLink>
+            {isClerkEnabled ? (
+              <>
+                <Show when="signed-out">
+                  <SignInButton mode="modal">
+                    <button
+                      type="button"
+                      onClick={closeMenu}
+                      className="inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-control)] border border-line-control bg-raised font-sans text-sm font-medium text-fg"
+                    >
+                      Log In
+                    </button>
+                  </SignInButton>
+                  <SignUpButton mode="modal">
+                    <button
+                      type="button"
+                      onClick={closeMenu}
+                      className="inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-control)] bg-accent font-sans text-sm font-medium text-white"
+                    >
+                      Sign Up
+                    </button>
+                  </SignUpButton>
+                </Show>
+                <Show when="signed-in">
+                  <div className="flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-surface p-3">
+                    <Link
+                      href="/dashboard"
+                      onClick={closeMenu}
+                      className="text-sm font-medium text-fg"
+                    >
+                      Go to Dashboard →
+                    </Link>
+                    <UserButton />
+                  </div>
+                </Show>
+              </>
+            ) : (
+              <>
+                <ButtonLink
+                  href="/login"
+                  variant="secondary"
+                  size="lg"
+                  className="w-full"
+                  onClick={closeMenu}
+                >
+                  Log In
+                </ButtonLink>
+                <ButtonLink
+                  href="/signup"
+                  variant="primary"
+                  size="lg"
+                  className="w-full"
+                  onClick={closeMenu}
+                >
+                  Sign Up
+                </ButtonLink>
+              </>
+            )}
           </div>
         </div>
       ) : null}

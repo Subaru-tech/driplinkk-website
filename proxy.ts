@@ -1,17 +1,19 @@
+import { clerkMiddleware } from "@clerk/nextjs/server";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "@/lib/supabase";
 
 /**
- * Refreshes the Supabase session on every matched request so Server Components
- * always see a valid token.
+ * Next.js 16 request proxy.
+ * Integrates Clerk middleware session handling while maintaining
+ * Supabase auth token refreshes.
  *
  * Next.js 16 renamed `middleware` to `proxy` (runtime is always nodejs).
  *
  * The actual auth *decision* lives in `app/dashboard/layout.tsx` — one guard,
  * in one place, next to the thing it protects.
  */
-export async function proxy(request: NextRequest) {
+export const proxy = clerkMiddleware(async (auth, request: NextRequest) => {
   let response = NextResponse.next({ request });
 
   if (!isSupabaseConfigured) return response;
@@ -35,11 +37,15 @@ export async function proxy(request: NextRequest) {
   await supabase.auth.getUser();
 
   return response;
-}
+});
+
+export default proxy;
 
 export const config = {
   matcher: [
     /* Everything except static assets and image optimisation. */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico)$).*)",
+    "/(api|trpc)(.*)",
+    "/__clerk/:path*",
   ],
 };
