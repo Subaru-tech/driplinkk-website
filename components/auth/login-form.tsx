@@ -4,24 +4,27 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { resolveHome } from "@/app/(auth)/actions";
 import { AuthCard } from "@/components/auth/auth-card";
+import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
 import { Button } from "@/components/ui/button";
 import { Field, Input, PasswordInput } from "@/components/ui/input";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/* Spec §4.1 — validation fires on blur, never on keystroke. Auth failures use
-   one generic message so we never leak which field was wrong.
-
-   No "which kind of account?" step: the account already has an answer, and
-   the server reads it after the password succeeds. Asking first could only
-   confirm what we know or contradict it. */
-
 export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const err = params.get("error");
+      if (err) {
+        return decodeURIComponent(err);
+      }
+    }
+    return null;
+  });
   const [pending, setPending] = useState(false);
 
   function validateEmail() {
@@ -77,53 +80,55 @@ export function LoginForm() {
       error={formError}
       footer={{ prompt: "Don't have an account?", href: "/signup", label: "Sign up" }}
     >
-      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
-        <Field label="Email" error={errors.email}>
-          {({ id, describedBy, invalid }) => (
-            <Input
-              id={id}
-              name="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onBlur={validateEmail}
-              aria-describedby={describedBy}
-              invalid={invalid}
-            />
-          )}
-        </Field>
+      <div className="flex flex-col gap-4">
+        <GoogleButton onError={(err) => setFormError(err)} disabled={pending} />
+        <AuthDivider />
 
-        <Field
-          label="Password"
-          error={errors.password}
-          action={
-            <Link href="/login/reset" className="text-xs text-muted transition-colors hover:text-fg">
-              Forgot password?
-            </Link>
-          }
-        >
-          {({ id, describedBy, invalid }) => (
-            <PasswordInput
-              id={id}
-              name="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onBlur={validatePassword}
-              aria-describedby={describedBy}
-              invalid={invalid}
-            />
-          )}
-        </Field>
+        <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
+          <Field label="Email" error={errors.email}>
+            {({ id, describedBy, invalid }) => (
+              <Input
+                id={id}
+                name="email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={validateEmail}
+                aria-describedby={describedBy}
+                invalid={invalid}
+              />
+            )}
+          </Field>
 
-        <Button type="submit" size="lg" loading={pending} className="w-full">
-          Log in
-        </Button>
-      </form>
+          <Field
+            label="Password"
+            error={errors.password}
+            action={
+              <Link href="/login/reset" className="text-xs text-muted transition-colors hover:text-fg">
+                Forgot password?
+              </Link>
+            }
+          >
+            {({ id, describedBy, invalid }) => (
+              <PasswordInput
+                id={id}
+                name="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onBlur={validatePassword}
+                aria-describedby={describedBy}
+                invalid={invalid}
+              />
+            )}
+          </Field>
 
-      {/* Spec §4.1: OAuth is explicitly out of scope for v1, so the "or"
-          divider is omitted too — it would separate nothing. */}
+          <Button type="submit" size="lg" loading={pending} className="w-full">
+            Log in
+          </Button>
+        </form>
+      </div>
     </AuthCard>
   );
 }

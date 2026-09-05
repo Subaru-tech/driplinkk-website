@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { AuthCard } from "@/components/auth/auth-card";
+import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
 import {
   PasswordRequirements,
   passwordIsValid,
@@ -99,7 +100,15 @@ export function SignupForm() {
       error={formError}
       footer={{ prompt: "Already have an account?", href: "/login", label: "Log in" }}
     >
-      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
+      <div className="flex flex-col gap-4">
+        <GoogleButton
+          onError={(err) => setFormError(err)}
+          text="Sign up with Google"
+          disabled={pending}
+        />
+        <AuthDivider text="or with email" />
+
+        <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
         <Field label="Name" error={errors.name}>
           {({ id, describedBy, invalid }) => (
             <Input
@@ -185,6 +194,7 @@ export function SignupForm() {
           Create account
         </Button>
       </form>
+      </div>
     </AuthCard>
   );
 }
