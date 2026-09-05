@@ -5,28 +5,31 @@ import { PasswordSection } from "@/components/dashboard/password-section";
 import { ProfileSection } from "@/components/dashboard/profile-section";
 import { SessionsSection } from "@/components/dashboard/sessions-section";
 import { getProfile } from "@/lib/queries";
-import { getCurrentUser } from "@/lib/supabase-server";
+import { getUnifiedUser } from "@/lib/clerk-supabase";
 
 export const metadata: Metadata = { title: "Account" };
 
 export default async function AccountPage() {
-  const [user, profile] = await Promise.all([getCurrentUser(), getProfile()]);
+  const [user, profileResult] = await Promise.all([getUnifiedUser(), getProfile()]);
+  const profile = profileResult.data;
 
   const email = user?.email ?? "";
-  const name =
-    profile.data?.full_name ?? (user?.user_metadata?.full_name as string | undefined) ?? "";
+  const name = profile?.full_name ?? user?.name ?? "";
+  const avatarUrl = profile?.avatar_url ?? user?.avatarUrl ?? null;
+  const authSource = user?.source ?? "supabase";
 
   return (
     <div className="flex flex-col gap-6">
-      {profile.backendReady ? null : <BackendNotice />}
+      {profileResult.backendReady ? null : <BackendNotice />}
 
       <ProfileSection
         initialName={name}
         initialEmail={email}
-        avatarUrl={profile.data?.avatar_url ?? null}
+        avatarUrl={avatarUrl}
+        authSource={authSource}
       />
 
-      <PasswordSection email={email} />
+      <PasswordSection email={email} authSource={authSource} />
 
       {/* Empty until Track 2 exposes a server route for session listing —
           see the note in SessionsSection. */}

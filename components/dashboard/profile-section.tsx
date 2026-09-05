@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { updateUserProfile } from "@/lib/actions/account-actions";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 /* Spec §6.5 — profile card. Save stays disabled until something actually
@@ -17,10 +18,12 @@ export function ProfileSection({
   initialName,
   initialEmail,
   avatarUrl,
+  authSource = "supabase",
 }: {
   initialName: string;
   initialEmail: string;
   avatarUrl: string | null;
+  authSource?: "clerk" | "supabase";
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -32,7 +35,8 @@ export function ProfileSection({
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [pending, setPending] = useState(false);
 
-  const dirty = name !== initialName || email !== initialEmail || avatarFile !== null;
+  const dirty =
+    name !== initialName || (authSource !== "clerk" && email !== initialEmail) || avatarFile !== null;
 
   function onPickAvatar(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -44,49 +48,43 @@ export function ProfileSection({
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
 
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) {
-      toast("error", "Can't save yet — the backend isn't connected.");
-      return;
-    }
-
     setPending(true);
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      const userId = auth.user?.id;
-      if (!userId) throw new Error("no user");
-
-      let uploadedPath = avatarUrl;
+      let uploadedAvatarUrl = avatarUrl;
       if (avatarFile) {
-        const extension = avatarFile.name.split(".").pop() ?? "png";
-        const path = `${userId}/avatar.${extension}`;
-        const { error: uploadError } = await supabase.storage
-          .from("avatars")
-          .upload(path, avatarFile, { upsert: true });
-        if (uploadError) throw uploadError;
-        uploadedPath = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+        // Read avatar as data URL so it works reliably across all auth providers
+        uploadedAvatarUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(avatarFile);
+        });
       }
 
-      if (name !== initialName || uploadedPath !== avatarUrl) {
-        const { error } = await supabase
-          .from("profiles")
-          .update({ full_name: name, avatar_url: uploadedPath })
-          .eq("id", userId);
-        if (error) throw error;
+      const res = await updateUserProfile({
+        fullName: name,
+        avatarUrl: uploadedAvatarUrl,
+      });
+
+      if (!res.success) {
+        throw new Error(res.error || "Failed to update profile.");
       }
 
-      if (email !== initialEmail) {
-        const { error } = await supabase.auth.updateUser({ email });
-        if (error) throw error;
-        toast("success", `Confirmation sent to ${email}. The change applies once you confirm it.`);
+      if (authSource !== "clerk" && email !== initialEmail) {
+        const supabase = getSupabaseBrowserClient();
+        if (supabase) {
+          const { error } = await supabase.auth.updateUser({ email });
+          if (error) throw error;
+          toast("success", `Confirmation sent to ${email}. The change applies once you confirm it.`);
+        }
       } else {
         toast("success", "Profile updated.");
       }
 
       setAvatarFile(null);
       router.refresh();
-    } catch {
-      toast("error", "Couldn't save those changes. Try again.");
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Couldn't save those changes. Try again.");
     } finally {
       setPending(false);
     }
@@ -138,12 +136,20 @@ export function ProfileSection({
           )}
         </Field>
 
-        <Field label="Email" hint="Changing your email sends a confirmation link to the new address. It won't take effect until you click it.">
+        <Field
+          label="Email"
+          hint={
+            authSource === "clerk"
+              ? "Managed by your Google / identity provider account."
+              : "Changing your email sends a confirmation link to the new address. It won't take effect until you click it."
+          }
+        >
           {({ id, describedBy }) => (
             <Input
               id={id}
               type="email"
               value={email}
+              disabled={authSource === "clerk"}
               onChange={(event) => setEmail(event.target.value)}
               autoComplete="email"
               aria-describedby={describedBy}

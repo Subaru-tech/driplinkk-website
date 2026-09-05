@@ -9,7 +9,7 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { formatDate } from "@/lib/format";
 import { CATEGORIES, LICENSES } from "@/lib/marketplace";
 import { getLibraryEntry, getPublicListing } from "@/lib/queries";
-import { getCurrentUser } from "@/lib/supabase-server";
+import { getUnifiedUser } from "@/lib/clerk-supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +37,7 @@ export default async function ModelPage({ params }: PageProps<"/models/[slug]">)
      the page would otherwise flash "Add to library" at someone who already
      has it. */
   const [user, libraryEntry] = await Promise.all([
-    getCurrentUser(),
+    getUnifiedUser(),
     getLibraryEntry(listing.id),
   ]);
 

@@ -307,8 +307,27 @@ export function ModelViewer({
 
         setStatus("ready");
 
+        /* ---- Auto Thumbnail Capture ---- */
+        let thumbTimer: ReturnType<typeof setTimeout> | null = null;
+        if (!hasThumbnail && modelId && !thumbnailCapturedRef.current) {
+          thumbTimer = setTimeout(async () => {
+            if (disposed || thumbnailCapturedRef.current) return;
+            thumbnailCapturedRef.current = true;
+            try {
+              const dataUrl = renderer.domElement.toDataURL("image/webp", 0.85);
+              if (dataUrl && dataUrl.length > 200) {
+                const { updateModelThumbnail } = await import("@/lib/actions/upload-actions");
+                await updateModelThumbnail({ id: modelId, thumbnailUrl: dataUrl });
+              }
+            } catch (err) {
+              console.warn("Failed to auto-save model thumbnail:", err);
+            }
+          }, 400);
+        }
+
         cleanup = () => {
           cancelAnimationFrame(frame);
+          if (thumbTimer) clearTimeout(thumbTimer);
           if (autoRotateTimer) clearTimeout(autoRotateTimer);
           renderer.domElement.removeEventListener("pointerdown", pauseAutoRotate);
           renderer.domElement.removeEventListener("wheel", pauseAutoRotate);

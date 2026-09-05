@@ -1,5 +1,6 @@
 "use client";
 
+import { ShieldCheck } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import {
   PasswordRequirements,
@@ -15,7 +16,13 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
  * Spec §6.5 — its own card with its own save button. Password changes are not
  * bundled into the profile submit.
  */
-export function PasswordSection({ email }: { email: string }) {
+export function PasswordSection({
+  email,
+  authSource = "supabase",
+}: {
+  email: string;
+  authSource?: "clerk" | "supabase";
+}) {
   const toast = useToast();
 
   const [current, setCurrent] = useState("");
@@ -23,6 +30,24 @@ export function PasswordSection({ email }: { email: string }) {
   const [confirm, setConfirm] = useState("");
   const [errors, setErrors] = useState<{ current?: string; next?: string; confirm?: string }>({});
   const [pending, setPending] = useState(false);
+
+  if (authSource === "clerk") {
+    return (
+      <Card as="section" className="flex flex-col gap-4">
+        <CardTitle>Password & Authentication</CardTitle>
+        <div className="flex items-center gap-3 rounded-[var(--radius-control)] border border-line bg-raised p-4">
+          <ShieldCheck className="size-5 shrink-0 text-accent" />
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium text-fg">Managed via Google / Identity Provider</p>
+            <p className="text-xs text-muted">
+              You are signed in securely using Google authentication. Password updates and multi-factor
+              authentication are handled directly through your identity provider.
+            </p>
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();

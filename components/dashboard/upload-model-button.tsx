@@ -145,6 +145,25 @@ export function UploadModelButton({ variant = "primary" }: { variant?: "primary"
           throw new Error(error || "Failed to save model to your library.");
         }
 
+        // Asynchronously render and save thumbnail in the background
+        void (async () => {
+          try {
+            const blob = await renderThumbnail(picked.file);
+            if (blob) {
+              const reader = new FileReader();
+              reader.onload = async () => {
+                const dataUrl = reader.result as string;
+                if (dataUrl && dataUrl.length > 200) {
+                  await updateModelThumbnail({ id: row.id, thumbnailUrl: dataUrl });
+                }
+              };
+              reader.readAsDataURL(blob);
+            }
+          } catch {
+            // Non-fatal: ModelViewer will backfill on first open
+          }
+        })();
+
         succeeded += 1;
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;

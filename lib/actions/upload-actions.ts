@@ -175,3 +175,50 @@ export async function recordUploadedListing({
 
   return { data };
 }
+
+/**
+ * Deletes an uploaded model and its storage blob from model-files.
+ */
+export async function deleteUploadedModel(id: string): Promise<{ success: boolean; error?: string }> {
+  const user = await getUnifiedUser();
+  if (!user) {
+    return { success: false, error: "You must be signed in to delete a model." };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) {
+    return { success: false, error: "Backend database not connected." };
+  }
+
+  // 1. Fetch model to get storage path and verify ownership
+  const { data: model } = await supabase
+    .from("models")
+    .select("id, storage_path")
+    .eq("id", id)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+
+  if (!model) {
+    return { success: false, error: "Model not found or not owned by you." };
+  }
+
+  // 2. Remove file from storage
+  if (model.storage_path) {
+    await supabase.storage.from("model-files").remove([model.storage_path]);
+  }
+
+  // 3. Delete database row
+  const { error } = await supabase
+    .from("models")
+    .delete()
+    .eq("id", id)
+    .eq("owner_id", user.id);
+
+  if (error) {
+    console.error("Failed to delete model row:", error);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
+}
+

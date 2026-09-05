@@ -8,6 +8,8 @@ import { useToast } from "@/components/ui/toast";
 import { formatCurrency } from "@/lib/format";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
+import { claimFreeListing } from "@/lib/actions/library-actions";
+
 /**
  * The one thing a visitor does on a model page.
  *
@@ -17,9 +19,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
  *   free        → add it, one click, no checkout
  *   paid        → say plainly that payments aren't live
  *
- * The free path writes a `library_items` row directly from the browser. The
- * RLS policy allows it only for a published listing priced at 0, so the rule
- * lives in the database and this component can't be the thing that enforces it.
+ * The free path writes a `library_items` row via claimFreeListing server action.
  */
 export function AcquirePanel({
   listingId,
@@ -40,31 +40,17 @@ export function AcquirePanel({
   const free = priceInr === 0;
 
   async function claim() {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) {
-      toast("error", "Can't add that yet — the backend isn't connected.");
-      return;
-    }
-
-    const { data: auth } = await supabase.auth.getUser();
-    if (!auth.user) {
+    if (!signedIn) {
       router.push("/login");
       return;
     }
 
     setPending(true);
-    const { error } = await supabase
-      .from("library_items")
-      .insert({ user_id: auth.user.id, listing_id: listingId, source: "free" });
+    const res = await claimFreeListing(listingId);
     setPending(false);
 
-    if (error) {
-      // 23505 = already in the library, which is the outcome they wanted.
-      if (error.code === "23505") {
-        setAdded(true);
-        return;
-      }
-      toast("error", error.message || "Couldn't add that to your library.");
+    if (!res.success) {
+      toast("error", res.error || "Couldn't add that to your library.");
       return;
     }
 

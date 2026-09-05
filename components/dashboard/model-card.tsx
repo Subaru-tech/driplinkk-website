@@ -13,6 +13,8 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import type { Model } from "@/lib/types";
 import { cn } from "@/lib/cn";
 
+import { deleteUploadedModel } from "@/lib/actions/upload-actions";
+
 /* Spec §6.2 — thumbnail, name (truncated), created date, credits spent.
    Hover reveals Open in App / Download / Delete. On touch/mobile the same
    three land in a 3-dot menu instead. */
@@ -37,20 +39,13 @@ export function ModelCard({ model }: { model: Model }) {
   }, [menuOpen]);
 
   async function deleteModel() {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) {
-      toast("error", "Can't delete yet — the backend isn't connected.");
-      setConfirmOpen(false);
-      return;
-    }
-
     setDeleting(true);
-    const { error } = await supabase.from("models").delete().eq("id", model.id);
+    const res = await deleteUploadedModel(model.id);
     setDeleting(false);
     setConfirmOpen(false);
 
-    if (error) {
-      toast("error", "Couldn't delete that model. Try again.");
+    if (!res.success) {
+      toast("error", res.error || "Couldn't delete that model. Try again.");
       return;
     }
 

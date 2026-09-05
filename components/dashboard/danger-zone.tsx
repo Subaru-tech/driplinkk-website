@@ -7,6 +7,9 @@ import { Field, Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 
+import { deleteUserAccount } from "@/lib/actions/account-actions";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
+
 /**
  * Spec §6.5 — visually separated, red-bordered, bottom of the page.
  * Deleting requires typing the account email, not just clicking a button.
@@ -23,14 +26,19 @@ export function DangerZone({ email }: { email: string }) {
   async function deleteAccount() {
     setPending(true);
     try {
-      /* Account deletion has to run server-side with the service-role key —
-         there is no client-side delete-my-user call. Track 2 owns this route. */
-      const response = await fetch("/api/account", { method: "DELETE" });
-      if (!response.ok) throw new Error("unavailable");
+      const res = await deleteUserAccount();
+      if (!res.success) throw new Error(res.error || "Failed to delete account");
+
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+
+      toast("success", "Your account has been deleted.");
       router.push("/");
       router.refresh();
-    } catch {
-      toast("error", "Account deletion isn't connected yet.");
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Account deletion failed. Try again.");
       setPending(false);
     }
   }

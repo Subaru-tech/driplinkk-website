@@ -4,7 +4,59 @@ import { LogOut, Store, UserCog } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useClerk } from "@clerk/nextjs";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+
+const isClerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+
+function AccountMenuSignOutItem() {
+  const { signOut } = useClerk();
+
+  async function handleSignOut() {
+    const supabase = getSupabaseBrowserClient();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    await signOut({ redirectUrl: "/login" });
+  }
+
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={handleSignOut}
+      className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-muted transition-colors hover:bg-raised hover:text-fg"
+    >
+      <LogOut className="size-4" aria-hidden="true" />
+      Sign out
+    </button>
+  );
+}
+
+function SupabaseAccountMenuSignOutItem() {
+  const router = useRouter();
+
+  async function handleSignOut() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
+
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={handleSignOut}
+      className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-muted transition-colors hover:bg-raised hover:text-fg"
+    >
+      <LogOut className="size-4" aria-hidden="true" />
+      Sign out
+    </button>
+  );
+}
+
 
 /** Avatar + account menu in the top bar — spec §5. */
 export function AccountMenu({
@@ -41,14 +93,6 @@ export function AccountMenu({
   }, [open]);
 
   const initial = (name ?? email ?? "?").trim().charAt(0).toUpperCase();
-
-  async function signOut() {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
-  }
 
   return (
     <div ref={containerRef} className="relative">
@@ -98,15 +142,7 @@ export function AccountMenu({
             {isSeller ? "Seller studio" : "Start selling"}
           </Link>
 
-          <button
-            type="button"
-            role="menuitem"
-            onClick={signOut}
-            className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-muted transition-colors hover:bg-raised hover:text-fg"
-          >
-            <LogOut className="size-4" aria-hidden="true" />
-            Sign out
-          </button>
+          {isClerkEnabled ? <AccountMenuSignOutItem /> : <SupabaseAccountMenuSignOutItem />}
         </div>
       ) : null}
     </div>

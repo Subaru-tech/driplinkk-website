@@ -105,9 +105,13 @@ export async function getMartOrders(limit?: number): Promise<QueryResult<MartOrd
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty([]);
 
+  const user = await getUnifiedUser();
+  if (!user) return empty([]);
+
   let query = supabase
     .from("mart_orders")
     .select("id, reference, model_name, status, total_inr, created_at, shipping_address")
+    .eq("buyer_id", user.id)
     .order("created_at", { ascending: false });
 
   if (limit) query = query.limit(limit);
@@ -121,10 +125,14 @@ export async function getMartOrder(id: string): Promise<QueryResult<MartOrder | 
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty(null);
 
+  const user = await getUnifiedUser();
+  if (!user) return empty(null);
+
   const { data, error } = await supabase
     .from("mart_orders")
     .select("id, reference, model_name, status, total_inr, created_at, shipping_address")
     .eq("id", id)
+    .eq("buyer_id", user.id)
     .maybeSingle();
 
   if (error) return empty(null);
@@ -138,10 +146,14 @@ export async function getLedgerPage(page: number, pageSize = 20): Promise<QueryR
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty({ entries: [], total: 0 });
 
+  const user = await getUnifiedUser();
+  if (!user) return empty({ entries: [], total: 0 });
+
   const from = (page - 1) * pageSize;
   const { data, error, count } = await supabase
     .from("credit_ledger")
     .select("id, created_at, type, amount, balance_after", { count: "exact" })
+    .eq("owner_id", user.id)
     .order("created_at", { ascending: false })
     .range(from, from + pageSize - 1);
 
@@ -156,9 +168,13 @@ export async function getActiveOrderCount(): Promise<QueryResult<number>> {
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty(0);
 
+  const user = await getUnifiedUser();
+  if (!user) return empty(0);
+
   const { count, error } = await supabase
     .from("mart_orders")
     .select("id", { count: "exact", head: true })
+    .eq("buyer_id", user.id)
     .in("status", ["Placed", "Confirmed", "Printing", "Shipped"]);
 
   if (error) return empty(0);
@@ -262,9 +278,13 @@ export async function getSales(limit?: number): Promise<QueryResult<Sale[]>> {
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty([]);
 
+  const user = await getUnifiedUser();
+  if (!user) return empty([]);
+
   let query = supabase
     .from("sales")
     .select("id, listing_id, gross_inr, platform_fee_inr, net_inr, created_at")
+    .eq("seller_id", user.id)
     .order("created_at", { ascending: false });
 
   if (limit) query = query.limit(limit);
@@ -279,7 +299,13 @@ export async function getSellerEarnings(): Promise<QueryResult<number>> {
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty(0);
 
-  const { data, error } = await supabase.from("sales").select("net_inr");
+  const user = await getUnifiedUser();
+  if (!user) return empty(0);
+
+  const { data, error } = await supabase
+    .from("sales")
+    .select("net_inr")
+    .eq("seller_id", user.id);
   if (error) return empty(0);
 
   const total = ((data as { net_inr: number }[]) ?? []).reduce(
@@ -293,9 +319,13 @@ export async function getPayouts(limit?: number): Promise<QueryResult<Payout[]>>
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty([]);
 
+  const user = await getUnifiedUser();
+  if (!user) return empty([]);
+
   let query = supabase
     .from("payouts")
     .select("id, amount_inr, state, reference, created_at, paid_at")
+    .eq("seller_id", user.id)
     .order("created_at", { ascending: false });
 
   if (limit) query = query.limit(limit);
@@ -310,10 +340,14 @@ export async function getSellerListing(id: string): Promise<QueryResult<Listing 
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty(null);
 
+  const user = await getUnifiedUser();
+  if (!user) return empty(null);
+
   const { data, error } = await supabase
     .from("listings")
     .select(LISTING_COLUMNS)
     .eq("id", id)
+    .eq("seller_id", user.id)
     .maybeSingle();
 
   if (error) return empty(null);
@@ -399,6 +433,9 @@ export async function getLibrary(): Promise<QueryResult<LibraryItem[]>> {
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty([]);
 
+  const user = await getUnifiedUser();
+  if (!user) return empty([]);
+
   const { data, error } = await supabase
     .from("library_items")
     .select(
@@ -406,6 +443,7 @@ export async function getLibrary(): Promise<QueryResult<LibraryItem[]>> {
         "listing:listings(id, title, slug, thumbnail_url, file_path, license, " +
         "seller:seller_profiles(studio_name))",
     )
+    .eq("user_id", user.id)
     .order("acquired_at", { ascending: false });
 
   if (error) return empty([]);
@@ -417,12 +455,13 @@ export async function getLibraryEntry(listingId: string): Promise<string | null>
   const supabase = await getSupabaseServerClient();
   if (!supabase) return null;
 
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return null;
+  const user = await getUnifiedUser();
+  if (!user) return null;
 
   const { data } = await supabase
     .from("library_items")
     .select("id")
+    .eq("user_id", user.id)
     .eq("listing_id", listingId)
     .maybeSingle();
 
