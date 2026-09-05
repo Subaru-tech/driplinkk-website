@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SignInButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
@@ -44,14 +45,34 @@ interface GoogleButtonProps {
   disabled?: boolean;
 }
 
-export function GoogleButton({
+function ClerkGoogleButton({
+  text = "Continue with Google",
+  disabled = false,
+}: GoogleButtonProps) {
+  return (
+    <SignInButton fallbackRedirectUrl="/dashboard" forceRedirectUrl="/dashboard">
+      <Button
+        type="button"
+        variant="secondary"
+        size="lg"
+        disabled={disabled}
+        className="w-full border-line-control hover:bg-raised"
+      >
+        <GoogleIcon className="size-4 shrink-0" />
+        <span>{text}</span>
+      </Button>
+    </SignInButton>
+  );
+}
+
+function SupabaseGoogleButton({
   onError,
   text = "Continue with Google",
   disabled = false,
 }: GoogleButtonProps) {
   const [pending, setPending] = useState(false);
 
-  async function handleGoogleSignIn() {
+  async function handleSupabaseGoogleSignIn() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
       onError("Sign-in isn't available yet — the backend isn't connected.");
@@ -83,11 +104,20 @@ export function GoogleButton({
       size="lg"
       loading={pending}
       disabled={disabled || pending}
-      onClick={handleGoogleSignIn}
+      onClick={handleSupabaseGoogleSignIn}
       className="w-full border-line-control hover:bg-raised"
     >
       <GoogleIcon className="size-4 shrink-0" />
       <span>{text}</span>
     </Button>
   );
+}
+
+const isClerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+
+export function GoogleButton(props: GoogleButtonProps) {
+  if (isClerkEnabled) {
+    return <ClerkGoogleButton {...props} />;
+  }
+  return <SupabaseGoogleButton {...props} />;
 }

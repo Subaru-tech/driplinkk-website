@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { isClerkConfigured, syncClerkProfile } from "@/lib/clerk-supabase";
 import { LISTING_SORTS, type Category, type ListingSort } from "@/lib/marketplace";
 import type {
   LedgerEntry,
@@ -41,6 +42,11 @@ function empty<T>(fallback: T): QueryResult<T> {
 export async function getProfile(): Promise<QueryResult<Profile | null>> {
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty(null);
+
+  if (isClerkConfigured) {
+    const profile = await syncClerkProfile();
+    if (profile) return { data: profile, backendReady: true };
+  }
 
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return empty(null);
@@ -175,13 +181,21 @@ export async function getSellerProfile(): Promise<QueryResult<SellerProfile | nu
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty(null);
 
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return empty(null);
+  let userId: string | null = null;
+  if (isClerkConfigured) {
+    const profile = await syncClerkProfile();
+    userId = profile?.id ?? null;
+  }
+  if (!userId) {
+    const { data: auth } = await supabase.auth.getUser();
+    userId = auth.user?.id ?? null;
+  }
+  if (!userId) return empty(null);
 
   const { data, error } = await supabase
     .from("seller_profiles")
     .select("id, studio_name, slug, bio, payout_status")
-    .eq("id", auth.user.id)
+    .eq("id", userId)
     .maybeSingle();
 
   if (error) return empty(null);

@@ -5,7 +5,7 @@ import { CreditChip } from "@/components/dashboard/credit-chip";
 import { DashboardShell, SIDEBAR_COOKIE } from "@/components/dashboard/dashboard-shell";
 import { getProfile, getSellerProfile } from "@/lib/queries";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { getCurrentUser } from "@/lib/supabase-server";
+import { getUnifiedUser, isClerkConfigured } from "@/lib/clerk-supabase";
 
 /**
  * Never prerender or cache anything under /dashboard. Without this, the pages
@@ -16,14 +16,15 @@ import { getCurrentUser } from "@/lib/supabase-server";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
-  const user = await getCurrentUser();
+  const user = await getUnifiedUser();
 
   /* Spec §2 — authenticated routes redirect to /login without a session.
-     While Supabase is unconfigured there is no session to check and no data to
+     While auth is unconfigured there is no session to check and no data to
      protect, so the shell renders with a "backend not connected" notice
      instead of bouncing every visitor to a login form that cannot work. Once
      the env vars are set, this is a hard guard. */
-  if (isSupabaseConfigured && !user) redirect("/login");
+  const isAuthConfigured = isClerkConfigured || isSupabaseConfigured;
+  if (isAuthConfigured && !user) redirect("/login");
 
   /* No role bounce here, on purpose.
      A seller is also a customer: they buy models, order prints and keep a
@@ -45,8 +46,8 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
       accountMenu={
         <AccountMenu
           email={user?.email ?? null}
-          name={profile?.full_name ?? (user?.user_metadata?.full_name as string | undefined) ?? null}
-          avatarUrl={profile?.avatar_url ?? null}
+          name={profile?.full_name ?? user?.name ?? null}
+          avatarUrl={profile?.avatar_url ?? user?.avatarUrl ?? null}
           isSeller={Boolean(seller)}
         />
       }

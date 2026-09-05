@@ -4,7 +4,7 @@ import { AccountMenu } from "@/components/dashboard/account-menu";
 import { DashboardShell, SIDEBAR_COOKIE } from "@/components/dashboard/dashboard-shell";
 import { getProfile, getSellerProfile } from "@/lib/queries";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { getCurrentUser } from "@/lib/supabase-server";
+import { getUnifiedUser, isClerkConfigured } from "@/lib/clerk-supabase";
 import { StartSelling } from "@/components/seller/start-selling";
 import { StatusPill } from "@/components/ui/status-pill";
 
@@ -20,9 +20,10 @@ export const dynamic = "force-dynamic";
  * three screens too early.
  */
 export default async function SellerLayout({ children }: LayoutProps<"/seller">) {
-  const user = await getCurrentUser();
+  const user = await getUnifiedUser();
 
-  if (isSupabaseConfigured && !user) redirect("/login");
+  const isAuthConfigured = isClerkConfigured || isSupabaseConfigured;
+  if (isAuthConfigured && !user) redirect("/login");
 
   const [{ data: profile }, { data: seller, backendReady }, cookieStore] = await Promise.all([
     getProfile(),
@@ -47,10 +48,10 @@ export default async function SellerLayout({ children }: LayoutProps<"/seller">)
           name={
             seller?.studio_name ??
             profile?.full_name ??
-            (user?.user_metadata?.full_name as string | undefined) ??
+            user?.name ??
             null
           }
-          avatarUrl={profile?.avatar_url ?? null}
+          avatarUrl={profile?.avatar_url ?? user?.avatarUrl ?? null}
           isSeller={Boolean(seller)}
         />
       }

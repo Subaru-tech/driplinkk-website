@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeScript } from "@/components/theme-script";
 import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
@@ -33,8 +34,10 @@ export const metadata: Metadata = {
     "DripLink builds LeaFF OS, Mart and the DripLink app — one pipeline from idea to printed part, without bouncing between two tools.",
 };
 
+const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
-  return (
+  const page = (
     <html
       lang="en"
       data-theme="dark"
@@ -49,4 +52,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </body>
     </html>
   );
+
+  if (clerkPublishableKey) {
+    return <ClerkProvider publishableKey={clerkPublishableKey}>{page}</ClerkProvider>;
+  }
+
+  return page;
 }
+
