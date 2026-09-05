@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import { isClerkConfigured, syncClerkProfile } from "@/lib/clerk-supabase";
+import { getUnifiedUser, isClerkConfigured, syncClerkProfile } from "@/lib/clerk-supabase";
 import { LISTING_SORTS, type Category, type ListingSort } from "@/lib/marketplace";
 import type {
   LedgerEntry,
@@ -77,11 +77,15 @@ export async function getModels(
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty([]);
 
+  const user = await getUnifiedUser();
+  if (!user) return empty([]);
+
   const sort = MODEL_SORTS[options.sort ?? "newest"];
 
   let query = supabase
     .from("models")
     .select("id, name, thumbnail_url, storage_path, credits_spent, created_at")
+    .eq("owner_id", user.id)
     .order(sort.column, { ascending: sort.ascending });
 
   if (options.search) {
@@ -165,9 +169,13 @@ export async function getModelCount(): Promise<QueryResult<number>> {
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty(0);
 
+  const user = await getUnifiedUser();
+  if (!user) return empty(0);
+
   const { count, error } = await supabase
     .from("models")
-    .select("id", { count: "exact", head: true });
+    .select("id", { count: "exact", head: true })
+    .eq("owner_id", user.id);
 
   if (error) return empty(0);
   return { data: count ?? 0, backendReady: true };
@@ -219,9 +227,13 @@ export async function getListings(limit?: number): Promise<QueryResult<Listing[]
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty([]);
 
+  const user = await getUnifiedUser();
+  if (!user) return empty([]);
+
   let query = supabase
     .from("listings")
     .select(LISTING_COLUMNS)
+    .eq("seller_id", user.id)
     .order("created_at", { ascending: false });
 
   if (limit) query = query.limit(limit);

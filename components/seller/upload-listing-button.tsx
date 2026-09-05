@@ -17,6 +17,7 @@ import {
   storagePathFor,
   uploadToStorage,
 } from "@/lib/uploads";
+import { getUploadSession, recordUploadedListing } from "@/lib/actions/upload-actions";
 
 /**
  * Create a listing from a file in the browser.
@@ -73,17 +74,15 @@ export function UploadListingButton() {
     setErrors(nextErrors);
     if (nextErrors.title || nextErrors.price || nextErrors.file || !file) return;
 
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) {
-      toast("error", "Uploads aren't available yet — the backend isn't connected.");
-      return;
-    }
-
-    const { data: sessionData } = await supabase.auth.getSession();
-    const session = sessionData.session;
+    const session = await getUploadSession();
     if (!session) {
-      toast("error", "Your session expired. Log in again.");
-      router.push("/login");
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) {
+        toast("error", "Uploads aren't available yet — the backend isn't connected.");
+      } else {
+        toast("error", "Your session expired. Log in again.");
+        router.push("/login");
+      }
       return;
     }
 
@@ -93,47 +92,42 @@ export function UploadListingButton() {
     setUploadError(null);
     setPercent(0);
 
-    const path = storagePathFor(session.user.id, file.name);
+    const path = storagePathFor(session.userId, file.name);
 
     try {
       await uploadToStorage({
         bucket: "model-files",
         path,
         file,
-        accessToken: session.access_token,
+        accessToken: session.accessToken,
         signal: controller.signal,
         onProgress: setPercent,
       });
 
-      const { data: row, error } = await supabase
-        .from("listings")
-        .insert({
-          seller_id: session.user.id,
-          title: title.trim(),
-          slug: slugify(title) || `listing-${Date.now()}`,
-          price_inr: parsedPrice,
-          status: "draft",
-          file_path: path,
-          file_bytes: file.size,
-        })
-        .select("id")
-        .single();
+      const { data: row, error } = await recordUploadedListing({
+        title: title.trim(),
+        slug: slugify(title) || `listing-${Date.now()}`,
+        description: "",
+        priceInr: parsedPrice,
+        storagePath: path,
+        fileBytes: file.size,
+      });
 
-      if (error) {
-        await supabase.storage.from("model-files").remove([path]);
-        throw new Error(
-          error.code === "23505"
-            ? "You already have a listing with that name."
-            : rowErrorMessage(error.code, "your listings"),
-        );
+      if (error || !row) {
+        const supabase = getSupabaseBrowserClient();
+        if (supabase) {
+          await supabase.storage.from("model-files").remove([path]);
+        }
+        throw new Error(error || "Failed to create listing.");
       }
 
-      if (row) {
+      const supabase = getSupabaseBrowserClient();
+      if (supabase && row.id) {
         void attachThumbnail(supabase, {
           file,
-          userId: session.user.id,
+          userId: session.userId,
           table: "listings",
-          id: row.id as string,
+          id: row.id,
         }).then((ok) => ok && router.refresh());
       }
 

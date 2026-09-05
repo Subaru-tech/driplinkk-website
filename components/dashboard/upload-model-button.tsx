@@ -15,6 +15,7 @@ import {
   storagePathFor,
   uploadToStorage,
 } from "@/lib/uploads";
+import { getUploadSession, recordUploadedModel } from "@/lib/actions/upload-actions";
 
 /**
  * Upload existing model files from the browser — no desktop app needed.
@@ -86,17 +87,15 @@ export function UploadModelButton({ variant = "primary" }: { variant?: "primary"
   }
 
   async function startUpload() {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) {
-      toast("error", "Uploads aren't available yet — the backend isn't connected.");
-      return;
-    }
-
-    const { data: sessionData } = await supabase.auth.getSession();
-    const session = sessionData.session;
+    const session = await getUploadSession();
     if (!session) {
-      toast("error", "Your session expired. Log in again.");
-      router.push("/login");
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) {
+        toast("error", "Uploads aren't available yet — the backend isn't connected.");
+      } else {
+        toast("error", "Your session expired. Log in again.");
+        router.push("/login");
+      }
       return;
     }
 
@@ -111,32 +110,30 @@ export function UploadModelButton({ variant = "primary" }: { variant?: "primary"
        other's bandwidth and makes every progress bar crawl at the same time,
        which reads as a stall. */
     for (const picked of files) {
-      const path = storagePathFor(session.user.id, picked.file.name);
+      const path = storagePathFor(session.userId, picked.file.name);
 
       try {
         await uploadToStorage({
           bucket: "model-files",
           path,
           file: picked.file,
-          accessToken: session.access_token,
+          accessToken: session.accessToken,
           signal: controller.signal,
           onProgress: (percent) =>
             setProgress((current) => ({ ...current, [picked.id]: { percent, error: null } })),
         });
 
-        const { data: row, error } = await supabase
-          .from("models")
-          .insert({
-            owner_id: session.user.id,
-            name: nameFromFilename(picked.file.name),
-            storage_path: path,
-          })
-          .select("id")
-          .single();
+        const { data: row, error } = await recordUploadedModel({
+          name: nameFromFilename(picked.file.name),
+          storagePath: path,
+        });
 
         if (error || !row) {
-          await supabase.storage.from("model-files").remove([path]);
-          throw new Error(rowErrorMessage(error?.code, "your library"));
+          const supabase = getSupabaseBrowserClient();
+          if (supabase) {
+            await supabase.storage.from("model-files").remove([path]);
+          }
+          throw new Error(error || "Failed to save model to your library.");
         }
 
         succeeded += 1;
@@ -144,12 +141,15 @@ export function UploadModelButton({ variant = "primary" }: { variant?: "primary"
         /* Thumbnail last, and deliberately outside the failure path: the model
            is already saved, so a browser that can't do WebGL loses a picture,
            not an upload. The card falls back to its icon. */
-        void attachThumbnail(supabase, {
-          file: picked.file,
-          userId: session.user.id,
-          table: "models",
-          id: row.id as string,
-        }).then((ok) => ok && router.refresh());
+        const supabase = getSupabaseBrowserClient();
+        if (supabase && row?.id) {
+          void attachThumbnail(supabase, {
+            file: picked.file,
+            userId: session.userId,
+            table: "models",
+            id: row.id,
+          }).then((ok) => ok && router.refresh());
+        }
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
         setProgress((current) => ({
