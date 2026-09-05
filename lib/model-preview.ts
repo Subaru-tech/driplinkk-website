@@ -165,12 +165,22 @@ export async function loadModel(
   switch (ext) {
     case ".stl": {
       const { STLLoader } = await import("three/addons/loaders/STLLoader.js");
-      const { mergeVertices, toCreasedNormals } = await import(
-        "three/addons/utils/BufferGeometryUtils.js"
-      );
       let geometry = new STLLoader().parse(buffer);
-      geometry = mergeVertices(geometry);
-      geometry = toCreasedNormals(geometry, (38 * Math.PI) / 180);
+
+      // Compute creased normals for smooth curves on moderate models (<120k vertices)
+      if (geometry.attributes.position && geometry.attributes.position.count <= 120000) {
+        try {
+          const { mergeVertices, toCreasedNormals } = await import(
+            "three/addons/utils/BufferGeometryUtils.js"
+          );
+          const merged = mergeVertices(geometry);
+          geometry = toCreasedNormals(merged, (38 * Math.PI) / 180);
+        } catch {
+          geometry.computeVertexNormals();
+        }
+      } else {
+        geometry.computeVertexNormals();
+      }
 
       const mesh = new THREE.Mesh(geometry, createPBRMaterial(preset, THREE));
       mesh.name = "primary_mesh";
@@ -187,12 +197,21 @@ export async function loadModel(
     }
     case ".ply": {
       const { PLYLoader } = await import("three/addons/loaders/PLYLoader.js");
-      const { mergeVertices, toCreasedNormals } = await import(
-        "three/addons/utils/BufferGeometryUtils.js"
-      );
       let geometry = new PLYLoader().parse(buffer);
-      geometry = mergeVertices(geometry);
-      geometry = toCreasedNormals(geometry, (38 * Math.PI) / 180);
+
+      if (geometry.attributes.position && geometry.attributes.position.count <= 120000) {
+        try {
+          const { mergeVertices, toCreasedNormals } = await import(
+            "three/addons/utils/BufferGeometryUtils.js"
+          );
+          const merged = mergeVertices(geometry);
+          geometry = toCreasedNormals(merged, (38 * Math.PI) / 180);
+        } catch {
+          geometry.computeVertexNormals();
+        }
+      } else {
+        geometry.computeVertexNormals();
+      }
 
       const mesh = new THREE.Mesh(geometry, createPBRMaterial(preset, THREE));
       mesh.name = "primary_mesh";
@@ -260,9 +279,9 @@ export async function loadModel(
 }
 
 /**
- * Frames the object tightly and centers it at ground level (Y = 0).
+ * Centers an object at the origin (0, 0, 0) and computes optimal framing.
  */
-export async function frameObject(object: Object3D, fovDegrees: number, padding = 1.12) {
+export async function frameObject(object: Object3D, fovDegrees: number, padding = 1.15) {
   const THREE = await import("three");
   object.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(object);
@@ -279,16 +298,10 @@ export async function frameObject(object: Object3D, fovDegrees: number, padding 
   const center = box.getCenter(new THREE.Vector3());
   const size = box.getSize(new THREE.Vector3());
 
-  // Center horizontally on X & Z, and place base on the ground plane (Y = 0)
-  object.position.x -= center.x;
-  object.position.z -= center.z;
-  object.position.y -= box.min.y;
-
+  // Center object directly at the origin (0, 0, 0)
+  object.position.sub(center);
   object.updateMatrixWorld(true);
 
-  // Recalculate box after transformation
-  const updatedBox = new THREE.Box3().setFromObject(object);
-  const updatedCenter = updatedBox.getCenter(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z);
   const radius = maxDim / 2;
 
@@ -296,7 +309,7 @@ export async function frameObject(object: Object3D, fovDegrees: number, padding 
   const fovRad = (fovDegrees * Math.PI) / 180;
   const distance = (maxDim / (2 * Math.tan(fovRad / 2))) * padding;
 
-  return { distance, radius, center: updatedCenter, size };
+  return { distance, radius, center: new THREE.Vector3(0, 0, 0), size };
 }
 
 /**

@@ -22,10 +22,6 @@ import {
   frameObject,
   loadModel,
 } from "@/lib/model-preview";
-import { updateModelThumbnail } from "@/lib/actions/upload-actions";
-import { getUploadSession } from "@/lib/actions/upload-actions";
-import { uploadToStorage } from "@/lib/uploads";
-import { SUPABASE_URL } from "@/lib/supabase";
 
 /**
  * Live 3D studio preview of an uploaded file.
@@ -121,24 +117,23 @@ export function ModelViewer({
         const height = container.clientHeight || 1;
         const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 10000);
 
-        const { distance, radius, center } = await frameObject(object, 40);
+        const { distance, radius, size } = await frameObject(object, 40);
 
         // Position camera at a classic three-quarter beauty shot
         const initialCameraPos = new THREE.Vector3(
           distance * 0.72,
-          distance * 0.42,
+          distance * 0.45,
           distance * 0.72,
         );
         camera.position.copy(initialCameraPos);
+        camera.lookAt(0, 0, 0);
         camera.near = distance * 0.02;
         camera.far = distance * 10;
         camera.updateProjectionMatrix();
 
         /* ---- Scaled 4-Light Studio Rig ---- */
-        // Hemisphere ambient: clean sky, slate ground
         scene.add(new THREE.HemisphereLight(0xf8fafc, 0x1e293b, 0.75));
 
-        // Key light: main soft studio overhead light with soft shadows
         const key = new THREE.DirectionalLight(0xffffff, 1.8);
         key.position.set(radius * 2.2, radius * 3.0, radius * 2.2);
         key.castShadow = true;
@@ -154,17 +149,15 @@ export function ModelViewer({
         key.shadow.camera.far = radius * 7.0;
         scene.add(key);
 
-        // Fill light: soft cool fill from opposite angle
         const fill = new THREE.DirectionalLight(0xb8cce4, 0.7);
         fill.position.set(-radius * 2.2, radius * 1.5, -radius * 1.2);
         scene.add(fill);
 
-        // Rim light: edge backlight for sharp silhouette definition
         const rim = new THREE.DirectionalLight(0xffffff, 0.9);
         rim.position.set(0, radius * 2.0, -radius * 2.8);
         scene.add(rim);
 
-        /* ---- Ground Contact Shadow ---- */
+        /* ---- Ground Contact Shadow directly under object ---- */
         const groundGeo = new THREE.PlaneGeometry(radius * 5, radius * 5);
         const shadowCanvas = document.createElement("canvas");
         shadowCanvas.width = 256;
@@ -184,7 +177,7 @@ export function ModelViewer({
         });
         const ground = new THREE.Mesh(groundGeo, groundMat);
         ground.rotation.x = -Math.PI / 2;
-        ground.position.y = 0.001;
+        ground.position.y = -size.y / 2 - 0.001;
         scene.add(ground);
 
         /* ---- Renderer ---- */
@@ -230,7 +223,7 @@ export function ModelViewer({
         controls.rotateSpeed = 0.8;
         controls.panSpeed = 0.6;
         controls.zoomSpeed = 1.1;
-        controls.target.copy(center);
+        controls.target.set(0, 0, 0);
         controls.minDistance = distance * 0.15;
         controls.maxDistance = distance * 5;
         controls.autoRotate = autoRotate;
@@ -254,7 +247,7 @@ export function ModelViewer({
         /* ---- Interactive Callbacks ---- */
         resetCameraRef.current = () => {
           camera.position.copy(initialCameraPos);
-          controls.target.copy(center);
+          controls.target.set(0, 0, 0);
           controls.update();
         };
 
@@ -296,46 +289,9 @@ export function ModelViewer({
         };
 
         /* ---- Render Loop ---- */
-        let renderedFrames = 0;
         const render = () => {
           controls.update();
           renderer.render(scene, camera);
-          renderedFrames++;
-
-          // Automatic thumbnail backfill: if this model has no thumbnail, capture one!
-          if (
-            !hasThumbnail &&
-            modelId &&
-            !thumbnailCapturedRef.current &&
-            renderedFrames > 5
-          ) {
-            thumbnailCapturedRef.current = true;
-            void (async () => {
-              try {
-                const session = await getUploadSession();
-                if (!session) return;
-                const blob = await new Promise<Blob | null>((resolve) =>
-                  renderer.domElement.toBlob(resolve, "image/png"),
-                );
-                if (!blob) return;
-
-                const thumbPath = `${session.userId}/models-${modelId}.png`;
-                const thumbFile = new File([blob], "thumb.png", { type: "image/png" });
-                await uploadToStorage({
-                  bucket: "model-art",
-                  path: thumbPath,
-                  file: thumbFile,
-                  accessToken: session.accessToken,
-                });
-
-                const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/model-art/${thumbPath}`;
-                await updateModelThumbnail({ id: modelId, thumbnailUrl: publicUrl });
-              } catch (thumbErr) {
-                console.warn("Auto-thumbnail backfill failed:", thumbErr);
-              }
-            })();
-          }
-
           frame = requestAnimationFrame(render);
         };
         frame = requestAnimationFrame(render);

@@ -122,27 +122,6 @@ export function UploadModelButton({ variant = "primary" }: { variant?: "primary"
       const path = storagePathFor(session.userId, picked.file.name);
 
       try {
-        // 1. Pre-render 3D thumbnail so the model card has its render immediately
-        let thumbnailUrl: string | null = null;
-        try {
-          const thumbBlob = await renderThumbnail(picked.file);
-          if (thumbBlob) {
-            const thumbPath = `${session.userId}/models-${Date.now()}-${slugify(nameFromFilename(picked.file.name))}.png`;
-            const thumbFile = new File([thumbBlob], "thumb.png", { type: "image/png" });
-            await uploadToStorage({
-              bucket: "model-art",
-              path: thumbPath,
-              file: thumbFile,
-              accessToken: session.accessToken,
-              signal: controller.signal,
-            });
-            thumbnailUrl = `${SUPABASE_URL}/storage/v1/object/public/model-art/${thumbPath}`;
-          }
-        } catch (thumbErr) {
-          console.warn("Pre-render thumbnail failed:", thumbErr);
-        }
-
-        // 2. Upload main model file
         await uploadToStorage({
           bucket: "model-files",
           path,
@@ -153,11 +132,9 @@ export function UploadModelButton({ variant = "primary" }: { variant?: "primary"
             setProgress((current) => ({ ...current, [picked.id]: { percent, error: null } })),
         });
 
-        // 3. Record model with thumbnail URL
         const { data: row, error } = await recordUploadedModel({
           name: nameFromFilename(picked.file.name),
           storagePath: path,
-          thumbnailUrl,
         });
 
         if (error || !row) {
@@ -169,16 +146,6 @@ export function UploadModelButton({ variant = "primary" }: { variant?: "primary"
         }
 
         succeeded += 1;
-
-        // Fallback: if pre-render didn't attach a thumbnail, attempt post-upload attach
-        if (!thumbnailUrl && row?.id) {
-          void attachThumbnail(session.accessToken, {
-            file: picked.file,
-            userId: session.userId,
-            table: "models",
-            id: row.id,
-          }).then((ok) => ok && router.refresh());
-        }
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
         setProgress((current) => ({
