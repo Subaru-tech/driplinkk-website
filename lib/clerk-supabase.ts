@@ -22,14 +22,17 @@ export type UnifiedUser = {
  * Returns the Supabase profile row (with its internal UUID and role).
  */
 export async function syncClerkProfile(): Promise<Profile | null> {
-  const { userId } = await auth();
-  if (!userId) return null;
+  if (!isClerkConfigured) return null;
 
-  const clerkUser = await currentUser();
-  if (!clerkUser) return null;
+  try {
+    const { userId } = await auth();
+    if (!userId) return null;
 
-  const supabase = await getSupabaseServerClient();
-  if (!supabase) return null;
+    const clerkUser = await currentUser();
+    if (!clerkUser) return null;
+
+    const supabase = await getSupabaseServerClient();
+    if (!supabase) return null;
 
   const email = clerkUser.emailAddresses?.[0]?.emailAddress ?? null;
   const fullName =
@@ -85,6 +88,10 @@ export async function syncClerkProfile(): Promise<Profile | null> {
   }
 
   return created as Profile;
+  } catch (err) {
+    console.error("syncClerkProfile error:", err);
+    return null;
+  }
 }
 
 /**

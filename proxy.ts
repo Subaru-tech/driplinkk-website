@@ -51,14 +51,17 @@ const clerkHandler = isClerkConfigured
     })
   : null;
 
-export const proxy = async (request: NextRequest, event: unknown) => {
+export async function proxy(request: NextRequest, event?: unknown) {
   if (clerkHandler) {
-    return clerkHandler(request, event as any);
+    try {
+      return await clerkHandler(request, event as any);
+    } catch (err) {
+      console.error("Proxy Clerk handler error:", err);
+      return handleSupabaseRefresh(request);
+    }
   }
   return handleSupabaseRefresh(request);
-};
-
-export default proxy;
+}
 
 export const config = {
   matcher: [
