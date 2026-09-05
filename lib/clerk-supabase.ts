@@ -92,34 +92,42 @@ export async function syncClerkProfile(): Promise<Profile | null> {
  */
 export async function getUnifiedUser(): Promise<UnifiedUser | null> {
   if (isClerkConfigured) {
-    const { userId } = await auth();
-    if (userId) {
-      const clerkUser = await currentUser();
-      if (clerkUser) {
-        const profile = await syncClerkProfile();
-        return {
-          id: profile?.id ?? userId,
-          authId: userId,
-          email: clerkUser.emailAddresses?.[0]?.emailAddress ?? null,
-          name: profile?.full_name ?? clerkUser.fullName ?? null,
-          avatarUrl: profile?.avatar_url ?? clerkUser.imageUrl ?? null,
-          source: "clerk",
-        };
+    try {
+      const { userId } = await auth();
+      if (userId) {
+        const clerkUser = await currentUser();
+        if (clerkUser) {
+          const profile = await syncClerkProfile();
+          return {
+            id: profile?.id ?? userId,
+            authId: userId,
+            email: clerkUser.emailAddresses?.[0]?.emailAddress ?? null,
+            name: profile?.full_name ?? clerkUser.fullName ?? null,
+            avatarUrl: profile?.avatar_url ?? clerkUser.imageUrl ?? null,
+            source: "clerk",
+          };
+        }
       }
+    } catch (err) {
+      console.error("Clerk getUnifiedUser error:", err);
     }
   }
 
   // Fallback to Supabase Auth
-  const sbUser = await getSupabaseUser();
-  if (sbUser) {
-    return {
-      id: sbUser.id,
-      authId: sbUser.id,
-      email: sbUser.email ?? null,
-      name: (sbUser.user_metadata?.full_name as string | undefined) ?? null,
-      avatarUrl: (sbUser.user_metadata?.avatar_url as string | undefined) ?? null,
-      source: "supabase",
-    };
+  try {
+    const sbUser = await getSupabaseUser();
+    if (sbUser) {
+      return {
+        id: sbUser.id,
+        authId: sbUser.id,
+        email: sbUser.email ?? null,
+        name: (sbUser.user_metadata?.full_name as string | undefined) ?? null,
+        avatarUrl: (sbUser.user_metadata?.avatar_url as string | undefined) ?? null,
+        source: "supabase",
+      };
+    }
+  } catch (err) {
+    console.error("Supabase getUnifiedUser error:", err);
   }
 
   return null;

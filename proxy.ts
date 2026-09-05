@@ -13,7 +13,11 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "@/lib/sup
  * The actual auth *decision* lives in `app/dashboard/layout.tsx` — one guard,
  * in one place, next to the thing it protects.
  */
-export const proxy = clerkMiddleware(async (auth, request: NextRequest) => {
+const isClerkConfigured = Boolean(
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY
+);
+
+async function handleSupabaseRefresh(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   if (!isSupabaseConfigured) return response;
@@ -37,7 +41,22 @@ export const proxy = clerkMiddleware(async (auth, request: NextRequest) => {
   await supabase.auth.getUser();
 
   return response;
-});
+}
+
+// Only instantiate clerkMiddleware if Clerk credentials are provided.
+// This prevents Next.js from crashing with 500 when environment variables are missing on Vercel.
+const clerkHandler = isClerkConfigured
+  ? clerkMiddleware(async (auth, request: NextRequest) => {
+      return handleSupabaseRefresh(request);
+    })
+  : null;
+
+export const proxy = async (request: NextRequest, event: unknown) => {
+  if (clerkHandler) {
+    return clerkHandler(request, event as any);
+  }
+  return handleSupabaseRefresh(request);
+};
 
 export default proxy;
 
