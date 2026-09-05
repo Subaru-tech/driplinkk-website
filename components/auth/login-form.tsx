@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { resolveHome } from "@/app/(auth)/actions";
 import { AuthCard } from "@/components/auth/auth-card";
@@ -19,8 +18,6 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
    confirm what we know or contradict it. */
 
 export function LoginForm() {
-  const router = useRouter();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
@@ -58,16 +55,19 @@ export function LoginForm() {
 
     if (error) {
       setPending(false);
-      // Deliberately generic — never reveal whether the email exists.
-      setFormError("Invalid email or password");
+      const msg = error.message.toLowerCase();
+      if (msg.includes("email not confirmed")) {
+        setFormError("Please verify your email address before logging in.");
+      } else if (msg.includes("invalid login credentials") || msg.includes("invalid_grant")) {
+        setFormError("Invalid email or password.");
+      } else {
+        setFormError(error.message || "Invalid email or password.");
+      }
       return;
     }
 
     const home = await resolveHome();
-    setPending(false);
-
-    router.push(home);
-    router.refresh();
+    window.location.href = home;
   }
 
   return (
