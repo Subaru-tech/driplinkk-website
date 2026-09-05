@@ -31,7 +31,26 @@ export async function syncClerkProfile(): Promise<Profile | null> {
   const supabase = await getSupabaseServerClient();
   if (!supabase) return null;
 
-  // 1. Check if profile already exists for this Clerk ID
+  const email = clerkUser.emailAddresses?.[0]?.emailAddress ?? null;
+  const fullName =
+    clerkUser.fullName ||
+    [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
+    email?.split("@")[0] ||
+    "Creator";
+  const avatarUrl = clerkUser.imageUrl || null;
+
+  // 1. Try atomic security definer RPC function first
+  const { data: rpcProfile, error: rpcError } = await supabase.rpc("sync_clerk_user_profile", {
+    p_clerk_id: userId,
+    p_full_name: fullName,
+    p_avatar_url: avatarUrl,
+  });
+
+  if (!rpcError && rpcProfile && rpcProfile.length > 0) {
+    return rpcProfile[0] as Profile;
+  }
+
+  // 2. Fallback: check if profile already exists for this Clerk ID
   const { data: existing } = await supabase
     .from("profiles")
     .select("*")
@@ -42,15 +61,7 @@ export async function syncClerkProfile(): Promise<Profile | null> {
     return existing as Profile;
   }
 
-  const email = clerkUser.emailAddresses?.[0]?.emailAddress ?? null;
-  const fullName =
-    clerkUser.fullName ||
-    [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
-    email?.split("@")[0] ||
-    "Creator";
-  const avatarUrl = clerkUser.imageUrl || null;
-
-  // 2. Insert new profile
+  // 3. Fallback insert new profile
   const { data: created, error } = await supabase
     .from("profiles")
     .insert({
@@ -64,7 +75,12 @@ export async function syncClerkProfile(): Promise<Profile | null> {
     .single();
 
   if (error) {
-    console.error("Failed to create Supabase profile for Clerk user:", error);
+    console.error("Failed to create Supabase profile for Clerk user:", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
     return null;
   }
 
