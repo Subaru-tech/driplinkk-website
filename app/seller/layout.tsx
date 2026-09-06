@@ -52,6 +52,7 @@ export default async function SellerLayout({ children }: LayoutProps<"/seller">)
           }
           avatarUrl={profile?.avatar_url ?? user?.avatarUrl ?? null}
           isSeller={Boolean(seller)}
+          isAdmin={profile?.role === "admin"}
         />
       }
     >

@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Store, UserCog } from "lucide-react";
+import { LogOut, ShieldCheck, Store, UserCog } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -66,11 +66,13 @@ export function AccountMenu({
   /* The seller side is opt-in, so the menu says either "go to it" or
      "start one" — the only two states an account can be in. */
   isSeller = false,
+  isAdmin = false,
 }: {
   email: string | null;
   name: string | null;
   avatarUrl: string | null;
   isSeller?: boolean;
+  isAdmin?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -141,6 +143,18 @@ export function AccountMenu({
             <Store className="size-4" aria-hidden="true" />
             {isSeller ? "Seller studio" : "Start selling"}
           </Link>
+
+          {isAdmin ? (
+            <Link
+              href="/admin/listings"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-accent transition-colors hover:bg-raised"
+            >
+              <ShieldCheck className="size-4" aria-hidden="true" />
+              Admin console
+            </Link>
+          ) : null}
 
           {isClerkEnabled ? <AccountMenuSignOutItem /> : <SupabaseAccountMenuSignOutItem />}
         </div>

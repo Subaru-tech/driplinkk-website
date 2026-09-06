@@ -51,7 +51,7 @@ export async function getProfile(): Promise<QueryResult<Profile | null>> {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, avatar_url, credits_balance")
+    .select("id, full_name, avatar_url, credits_balance, role")
     .eq("id", auth.user.id)
     .maybeSingle();
 
@@ -451,3 +451,66 @@ export async function getLibraryEntry(listingId: string): Promise<string | null>
 
   return (data as { id: string } | null)?.id ?? null;
 }
+
+/* -------------------------------------------------------------- Admin side */
+
+export type AdminListing = Listing & {
+  seller: { studio_name: string; slug: string } | null;
+};
+
+export async function getAdminPendingListings(): Promise<QueryResult<AdminListing[]>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty([]);
+
+  const { data, error } = await supabase
+    .from("listings")
+    .select(`${LISTING_COLUMNS}, seller:seller_profiles(studio_name, slug)`)
+    .in("status", ["pending", "in_review"])
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("getAdminPendingListings error:", error);
+    return empty([]);
+  }
+  return { data: (data as unknown as AdminListing[]) ?? [], backendReady: true };
+}
+
+export type AdminMartOrder = MartOrder & {
+  assigned_vendor: string | null;
+  vendor_notes: string | null;
+  buyer: { id: string; full_name: string | null } | null;
+};
+
+export async function getAdminMartOrders(statusFilter?: string): Promise<QueryResult<AdminMartOrder[]>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty([]);
+
+  let query = supabase
+    .from("mart_orders")
+    .select(`
+      id,
+      reference,
+      model_name,
+      status,
+      total_inr,
+      created_at,
+      shipping_address,
+      assigned_vendor,
+      vendor_notes,
+      buyer:profiles!mart_orders_buyer_id_fkey(id, full_name)
+    `)
+    .order("created_at", { ascending: false });
+
+  if (statusFilter && statusFilter.toLowerCase() !== "all") {
+    query = query.eq("status", statusFilter);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("getAdminMartOrders error:", error);
+    return empty([]);
+  }
+  return { data: (data as unknown as AdminMartOrder[]) ?? [], backendReady: true };
+}
+

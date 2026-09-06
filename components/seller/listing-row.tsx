@@ -6,6 +6,7 @@ import type { Listing, ListingStatus } from "@/lib/types";
 const tones: Record<ListingStatus, StatusTone> = {
   draft: "neutral",
   in_review: "warning",
+  pending: "warning",
   published: "accent",
   rejected: "danger",
   archived: "neutral",
@@ -14,6 +15,7 @@ const tones: Record<ListingStatus, StatusTone> = {
 const labels: Record<ListingStatus, string> = {
   draft: "Draft",
   in_review: "In review",
+  pending: "Pending",
   published: "Published",
   rejected: "Rejected",
   archived: "Archived",

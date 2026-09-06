@@ -1,20 +1,13 @@
-import { Boxes, Store, type LucideIcon } from "lucide-react";
+import { Boxes, ShieldCheck, Store, type LucideIcon } from "lucide-react";
 
 /**
- * The two kinds of account.
+ * The kinds of account.
  *
  * Everything role-shaped in the UI renders from this list — the login popup,
- * the sign-up form's extra fields, the post-login redirect. Adding a third
- * role means adding an entry here and a branch in the backend's
- * `handle_new_user()` trigger; no component needs editing.
- *
- * The role a visitor picks in the popup is a ROUTE HINT, not a credential. It
- * is verified against `profiles.role` on the server after sign-in
- * (`app/(auth)/actions.ts`), so choosing the wrong door gets a clear message,
- * never access.
+ * the sign-up form's extra fields, the post-login redirect.
  */
 
-export const ROLE_IDS = ["creator", "seller"] as const;
+export const ROLE_IDS = ["creator", "seller", "admin"] as const;
 
 export type UserRole = (typeof ROLE_IDS)[number];
 
@@ -51,6 +44,15 @@ export const ROLES: Record<UserRole, RoleDefinition> = {
     capabilities: ["List models for sale", "Track sales & downloads", "Receive payouts"],
     icon: Store,
     home: "/seller",
+  },
+  admin: {
+    id: "admin",
+    label: "Admin",
+    headline: "I'm here to manage the platform",
+    blurb: "Review listings, route mart orders, and manage platform operations.",
+    capabilities: ["Review submitted listings", "Manage & route mart orders", "System administration"],
+    icon: ShieldCheck,
+    home: "/admin/listings",
   },
 };
 

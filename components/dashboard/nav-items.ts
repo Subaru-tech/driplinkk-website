@@ -39,6 +39,12 @@ export const SELLER_NAV_ITEMS: NavItem[] = [
   { href: "/seller/account", label: "Account", shortLabel: "Account", icon: UserCog },
 ];
 
+/** The admin area — /admin/*. Review pending listings and fulfill orders. */
+export const ADMIN_NAV_ITEMS: NavItem[] = [
+  { href: "/admin/listings", label: "Pending Listings", shortLabel: "Listings", icon: Package },
+  { href: "/admin/mart-orders", label: "Mart Orders", shortLabel: "Orders", icon: Truck },
+];
+
 /** Page title shown in the top bar. Longest match wins. */
 export function titleForPath(pathname: string, items: NavItem[] = NAV_ITEMS): string {
   const match = [...items]

@@ -9,5 +9,6 @@ export * from "./db/queries";
 
 // Server actions
 export * from "./actions/account";
+export * from "./actions/admin";
 export * from "./actions/library";
 export * from "./actions/upload";

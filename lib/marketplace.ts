@@ -97,6 +97,7 @@ export function publishBlockers(listing: {
 export const STATUS_LABELS: Record<ListingStatus, string> = {
   draft: "Draft",
   in_review: "In review",
+  pending: "Pending",
   published: "Published",
   rejected: "Rejected",
   archived: "Archived",

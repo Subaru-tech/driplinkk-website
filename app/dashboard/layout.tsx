@@ -48,6 +48,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           name={profile?.full_name ?? user?.name ?? null}
           avatarUrl={profile?.avatar_url ?? user?.avatarUrl ?? null}
           isSeller={Boolean(seller)}
+          isAdmin={profile?.role === "admin"}
         />
       }
     >

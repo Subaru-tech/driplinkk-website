@@ -4,7 +4,7 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { NAV_ITEMS, SELLER_NAV_ITEMS, titleForPath } from "@/components/dashboard/nav-items";
+import { ADMIN_NAV_ITEMS, NAV_ITEMS, SELLER_NAV_ITEMS, titleForPath } from "@/components/dashboard/nav-items";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
 import { Wordmark } from "@/components/marketing/wordmark";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -23,20 +23,20 @@ export function DashboardShell({
   defaultCollapsed,
   creditChip,
   accountMenu,
-  /* The seller area (/seller/*) reuses this shell with its own doors. The
-     nav is selected by name, not passed in: the items carry Lucide icon
-     components, which cannot cross the server → client boundary. */
+  /* The seller area (/seller/*) and admin area (/admin/*) reuse this shell. */
   area = "creator",
   children,
 }: {
   defaultCollapsed: boolean;
   creditChip: ReactNode;
   accountMenu: ReactNode;
-  area?: "creator" | "seller";
+  area?: "creator" | "seller" | "admin";
   children: ReactNode;
 }) {
-  const navItems = area === "seller" ? SELLER_NAV_ITEMS : NAV_ITEMS;
-  const rootHref = area === "seller" ? "/seller" : "/dashboard";
+  const navItems =
+    area === "admin" ? ADMIN_NAV_ITEMS : area === "seller" ? SELLER_NAV_ITEMS : NAV_ITEMS;
+  const rootHref =
+    area === "admin" ? "/admin/listings" : area === "seller" ? "/seller" : "/dashboard";
 
   const pathname = usePathname();
 

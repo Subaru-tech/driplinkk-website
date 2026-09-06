@@ -13,6 +13,7 @@ export type Profile = {
   full_name: string | null;
   avatar_url: string | null;
   credits_balance: number;
+  role?: "creator" | "seller" | "admin";
 };
 
 export type Model = {
@@ -35,6 +36,9 @@ export type MartOrder = {
   total_inr: number;
   created_at: string;
   shipping_address: string | null;
+  assigned_vendor?: string | null;
+  vendor_notes?: string | null;
+  buyer?: { id: string; full_name: string | null } | null;
 };
 
 export type LedgerEntryType = "Generation" | "Purchase" | "Refund";
@@ -67,7 +71,7 @@ export type SellerProfile = {
   payout_status: "unverified" | "pending" | "verified" | "rejected";
 };
 
-export type ListingStatus = "draft" | "in_review" | "published" | "rejected" | "archived";
+export type ListingStatus = "draft" | "in_review" | "published" | "rejected" | "archived" | "pending";
 
 export type Listing = {
   id: string;
