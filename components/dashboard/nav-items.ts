@@ -43,6 +43,7 @@ export const SELLER_NAV_ITEMS: NavItem[] = [
 export const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: "/admin/listings", label: "Pending Listings", shortLabel: "Listings", icon: Package },
   { href: "/admin/mart-orders", label: "Mart Orders", shortLabel: "Orders", icon: Truck },
+  { href: "/dashboard", label: "Creator App", shortLabel: "Creator", icon: LayoutDashboard },
 ];
 
 /** Page title shown in the top bar. Longest match wins. */

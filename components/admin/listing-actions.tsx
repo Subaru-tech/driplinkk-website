@@ -5,8 +5,15 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { updateListingStatusAdmin } from "@/driplink-web-backend/actions/admin";
+import { cn } from "@/lib/cn";
 
-export function ListingReviewActions({ listingId }: { listingId: string }) {
+export function ListingReviewActions({
+  listingId,
+  fullWidth = false,
+}: {
+  listingId: string;
+  fullWidth?: boolean;
+}) {
   const [loadingAction, setLoadingAction] = useState<"approve" | "reject" | null>(null);
   const toast = useToast();
 
@@ -43,7 +50,7 @@ export function ListingReviewActions({ listingId }: { listingId: string }) {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={cn("flex items-center gap-2", fullWidth ? "w-full" : "justify-end")}>
       <Button
         variant="primary"
         size="sm"
@@ -51,6 +58,7 @@ export function ListingReviewActions({ listingId }: { listingId: string }) {
         disabled={loadingAction !== null}
         onClick={handleApprove}
         aria-label="Approve listing"
+        className={fullWidth ? "flex-1" : undefined}
       >
         <Check className="size-3.5" aria-hidden="true" />
         Approve
@@ -63,6 +71,7 @@ export function ListingReviewActions({ listingId }: { listingId: string }) {
         disabled={loadingAction !== null}
         onClick={handleReject}
         aria-label="Reject listing"
+        className={fullWidth ? "flex-1" : undefined}
       >
         <X className="size-3.5" aria-hidden="true" />
         Reject
