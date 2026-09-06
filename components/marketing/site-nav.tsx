@@ -99,14 +99,11 @@ export function SiteNav() {
                 <ButtonLink href="/login" variant="ghost" size="sm">
                   Log In
                 </ButtonLink>
-                <ButtonLink href="/signup" variant="primary" size="sm">
+                <ButtonLink href="/sign-up" variant="primary" size="sm">
                   Sign Up
                 </ButtonLink>
               </Show>
               <Show when="signed-in">
-                <ButtonLink href="/dashboard" variant="ghost" size="sm">
-                  Dashboard
-                </ButtonLink>
                 <UserButton />
               </Show>
             </>
@@ -115,7 +112,7 @@ export function SiteNav() {
               <ButtonLink href="/login" variant="ghost" size="sm">
                 Log In
               </ButtonLink>
-              <ButtonLink href="/signup" variant="primary" size="sm">
+              <ButtonLink href="/sign-up" variant="primary" size="sm">
                 Sign Up
               </ButtonLink>
             </>
@@ -186,7 +183,7 @@ export function SiteNav() {
                     Log In
                   </ButtonLink>
                   <ButtonLink
-                    href="/signup"
+                    href="/sign-up"
                     variant="primary"
                     size="lg"
                     className="w-full"
@@ -196,14 +193,7 @@ export function SiteNav() {
                   </ButtonLink>
                 </Show>
                 <Show when="signed-in">
-                  <div className="flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-surface p-3">
-                    <Link
-                      href="/dashboard"
-                      onClick={closeMenu}
-                      className="text-sm font-medium text-fg"
-                    >
-                      Go to Dashboard →
-                    </Link>
+                  <div className="flex items-center justify-end rounded-[var(--radius-card)] border border-line bg-surface p-3">
                     <UserButton />
                   </div>
                 </Show>
@@ -220,7 +210,7 @@ export function SiteNav() {
                   Log In
                 </ButtonLink>
                 <ButtonLink
-                  href="/signup"
+                  href="/sign-up"
                   variant="primary"
                   size="lg"
                   className="w-full"

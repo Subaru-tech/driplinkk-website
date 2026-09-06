@@ -5,6 +5,18 @@ const nextConfig: NextConfig = {
      framework to scanners. */
   poweredByHeader: false,
 
+  async redirects() {
+    return [
+      {
+        /* My Library was merged into the Acquired tab of My Models.
+           Permanent so the old URL is not served again after the first visit. */
+        source: "/dashboard/library",
+        destination: "/dashboard/models?tab=acquired",
+        permanent: true,
+      },
+    ];
+  },
+
   async headers() {
     return [
       {

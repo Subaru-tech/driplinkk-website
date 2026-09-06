@@ -58,8 +58,8 @@ export function CinematicHero() {
           </p>
 
           <div className="hero-pull mt-10 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-            <ButtonLink href="/signup" size="lg">
-              Join Waitlist
+            <ButtonLink href="/sign-up" size="lg">
+              Sign Up
             </ButtonLink>
             <ButtonLink href="#problem" variant="secondary" size="lg">
               See how it works

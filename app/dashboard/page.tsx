@@ -29,24 +29,52 @@ export default async function OverviewPage() {
     <div className="flex flex-col gap-8">
       {backendReady ? null : <BackendNotice />}
 
-      {/* Stat row — spec §6.1 */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <StatCard
-          label="Credit Balance"
-          value={profile.data ? formatCredits(profile.data.credits_balance) : null}
-          action={{ href: "/dashboard/billing", label: "Buy more" }}
-        />
-        <StatCard
-          label="Models Created"
-          value={modelCount.backendReady ? formatCredits(modelCount.data) : null}
-        />
-        <StatCard
-          label="Active Mart Orders"
-          value={activeOrders.backendReady ? formatCredits(activeOrders.data) : null}
-        />
-      </div>
+      {/* Fix §4 — zero-state: if no models yet, lead with the actionable card
+          so new accounts aren't greeted with a row of inert zeros.
+          Once there's data, the stat row is meaningful and comes first. */}
+      {modelCount.backendReady && modelCount.data === 0 ? (
+        <>
+          <StartModelCard />
 
-      <StartModelCard />
+          {/* Stat row — spec §6.1 — secondary position for empty accounts */}
+          <div className="grid gap-4 md:grid-cols-3">
+            <StatCard
+              label="Credit Balance"
+              value={profile.data ? formatCredits(profile.data.credits_balance) : null}
+              action={{ href: "/dashboard/billing", label: "Buy more" }}
+            />
+            <StatCard
+              label="Models Created"
+              value={modelCount.backendReady ? formatCredits(modelCount.data) : null}
+            />
+            <StatCard
+              label="Active Mart Orders"
+              value={activeOrders.backendReady ? formatCredits(activeOrders.data) : null}
+            />
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Stat row — spec §6.1 */}
+          <div className="grid gap-4 md:grid-cols-3">
+            <StatCard
+              label="Credit Balance"
+              value={profile.data ? formatCredits(profile.data.credits_balance) : null}
+              action={{ href: "/dashboard/billing", label: "Buy more" }}
+            />
+            <StatCard
+              label="Models Created"
+              value={modelCount.backendReady ? formatCredits(modelCount.data) : null}
+            />
+            <StatCard
+              label="Active Mart Orders"
+              value={activeOrders.backendReady ? formatCredits(activeOrders.data) : null}
+            />
+          </div>
+
+          <StartModelCard />
+        </>
+      )}
 
       {/* Recent Models — horizontal scroll row, max 4 (spec §6.1) */}
       <section className="flex flex-col gap-4">
