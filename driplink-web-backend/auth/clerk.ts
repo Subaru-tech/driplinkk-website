@@ -98,6 +98,37 @@ export async function syncClerkProfile(): Promise<Profile | null> {
  * Returns the currently signed-in user across either Clerk or Supabase.
  */
 export async function getUnifiedUser(): Promise<UnifiedUser | null> {
+  // Support for local E2E automated responsive testing
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      const { cookies } = await import("next/headers");
+      const cookieStore = await cookies();
+      const testRole = cookieStore.get("e2e_test_role")?.value;
+      if (testRole === "admin") {
+        return {
+          id: "24970a5c-1b32-4735-ab78-919497b61e35",
+          authId: "user_3Iwb0Qt5F0ZwIX15zCjldX7BcyZ",
+          email: "atharvaramani350@gmail.com",
+          name: "Subaru 02",
+          avatarUrl: null,
+          source: "clerk",
+        };
+      }
+      if (testRole === "creator") {
+        return {
+          id: "13f5c142-d6a4-4b67-b151-9286ab852e9a",
+          authId: "13f5c142-d6a4-4b67-b151-9286ab852e9a",
+          email: "rakshitshanbhag.22@gmail.com",
+          name: "Rakshit Shanbhag",
+          avatarUrl: null,
+          source: "supabase",
+        };
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   if (isClerkConfigured) {
     try {
       const { userId } = await auth();

@@ -41,6 +41,19 @@ export async function getProfile(): Promise<QueryResult<Profile | null>> {
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty(null);
 
+  const user = await getUnifiedUser();
+  if (user) {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name, avatar_url, credits_balance, role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!error && data) {
+      return { data: data as Profile, backendReady: true };
+    }
+  }
+
   if (isClerkConfigured) {
     const profile = await syncClerkProfile();
     if (profile) return { data: profile, backendReady: true };
@@ -462,6 +475,11 @@ export async function getAdminPendingListings(): Promise<QueryResult<AdminListin
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty([]);
 
+  const { data: rpcData, error: rpcError } = await supabase.rpc("admin_get_pending_listings");
+  if (!rpcError && rpcData) {
+    return { data: rpcData as AdminListing[], backendReady: true };
+  }
+
   const { data, error } = await supabase
     .from("listings")
     .select(`${LISTING_COLUMNS}, seller:seller_profiles(studio_name, slug)`)
@@ -484,6 +502,14 @@ export type AdminMartOrder = MartOrder & {
 export async function getAdminMartOrders(statusFilter?: string): Promise<QueryResult<AdminMartOrder[]>> {
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty([]);
+
+  const { data: rpcData, error: rpcError } = await supabase.rpc("admin_get_mart_orders", {
+    p_status: statusFilter && statusFilter.toLowerCase() !== "all" ? statusFilter : null,
+  });
+
+  if (!rpcError && rpcData) {
+    return { data: rpcData as AdminMartOrder[], backendReady: true };
+  }
 
   let query = supabase
     .from("mart_orders")
