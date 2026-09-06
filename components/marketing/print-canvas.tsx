@@ -365,7 +365,7 @@ export function PrintCanvas({ className }: { className?: string }) {
          viewport width (the canvas box is ~15px narrower, so 768 used to fall
          through to the narrow branch). Its numbers are tuned here for the
          first time: 0.44 put the canopy 11px into the CTA row. */
-      const heightFrac = wide ? 0.88 : medium ? 0.36 : 0.32;
+      const heightFrac = wide ? 0.88 : medium ? 0.36 : 0.25;
       /* Width is the binding constraint on wide layouts, so this is the dial
          that actually controls how broad the machine reads. */
       const widthFrac = wide ? 0.52 : 0.86;
@@ -378,7 +378,7 @@ export function PrintCanvas({ className }: { className?: string }) {
       originX = anchorX - bboxCx * unit;
       originY = wide
         ? height * 0.5 + ((bbox.top + bbox.bottom) / 2) * unit
-        : height * 0.985;
+        : height * 0.99;
 
       /* ---- assembly ------------------------------------------------------
          Each subassembly flies in from its own direction, tumbling as it goes,
