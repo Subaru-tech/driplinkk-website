@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import { useSignIn } from "@clerk/nextjs";
 import { resolveHome } from "@/app/(auth)/actions";
 import { AuthCard } from "@/components/auth/auth-card";
 import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
@@ -10,21 +11,135 @@ import { Field, Input, PasswordInput } from "@/components/ui/input";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const isClerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
-export function LoginForm() {
+function ClerkLoginForm({ initialError }: { initialError: string | null }) {
+  const { signIn, fetchStatus } = useSignIn();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
-  const [formError, setFormError] = useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const err = params.get("error");
-      if (err) {
-        return decodeURIComponent(err);
-      }
+  const [formError, setFormError] = useState<string | null>(initialError);
+  const [pending, setPending] = useState(false);
+
+  function validateEmail() {
+    setErrors((e) => ({
+      ...e,
+      email: EMAIL_RE.test(email) ? undefined : "Enter a valid email address.",
+    }));
+  }
+
+  function validatePassword() {
+    setErrors((e) => ({ ...e, password: password ? undefined : "Enter your password." }));
+  }
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    setFormError(null);
+
+    const emailError = EMAIL_RE.test(email) ? undefined : "Enter a valid email address.";
+    const passwordError = password ? undefined : "Enter your password.";
+    setErrors({ email: emailError, password: passwordError });
+    if (emailError || passwordError) return;
+
+    if (!signIn) {
+      setFormError("Authentication service is initializing. Please try again.");
+      return;
     }
-    return null;
-  });
+
+    setPending(true);
+    try {
+      const { error } = await signIn.password({
+        identifier: email,
+        password: password,
+      });
+
+      if (error) {
+        setPending(false);
+        const msg = error.message || "Invalid email or password.";
+        setFormError(msg);
+        return;
+      }
+
+      await signIn.finalize({
+        navigate: async ({ decorateUrl }) => {
+          const home = await resolveHome();
+          const target = decorateUrl ? decorateUrl(home) : home;
+          window.location.href = target;
+        },
+      });
+    } catch (err: unknown) {
+      setPending(false);
+      setFormError(err instanceof Error ? err.message : "Failed to sign in.");
+    }
+  }
+
+  const isSubmitting = pending || fetchStatus === "fetching";
+
+  return (
+    <AuthCard
+      title="Log in"
+      subtitle="Welcome back."
+      error={formError}
+      footer={{ prompt: "Don't have an account?", href: "/signup", label: "Sign up" }}
+    >
+      <div className="flex flex-col gap-4">
+        <GoogleButton onError={(err) => setFormError(err)} disabled={isSubmitting} />
+        <AuthDivider />
+
+        <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
+          <Field label="Email" error={errors.email}>
+            {({ id, describedBy, invalid }) => (
+              <Input
+                id={id}
+                name="email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={validateEmail}
+                aria-describedby={describedBy}
+                invalid={invalid}
+              />
+            )}
+          </Field>
+
+          <Field
+            label="Password"
+            error={errors.password}
+            action={
+              <Link href="/login/reset" className="text-xs text-muted transition-colors hover:text-fg">
+                Forgot password?
+              </Link>
+            }
+          >
+            {({ id, describedBy, invalid }) => (
+              <PasswordInput
+                id={id}
+                name="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onBlur={validatePassword}
+                aria-describedby={describedBy}
+                invalid={invalid}
+              />
+            )}
+          </Field>
+
+          <Button type="submit" size="lg" loading={isSubmitting} className="w-full">
+            Log in
+          </Button>
+        </form>
+      </div>
+    </AuthCard>
+  );
+}
+
+function SupabaseLoginForm({ initialError }: { initialError: string | null }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [formError, setFormError] = useState<string | null>(initialError);
   const [pending, setPending] = useState(false);
 
   function validateEmail() {
@@ -131,4 +246,23 @@ export function LoginForm() {
       </div>
     </AuthCard>
   );
+}
+
+export function LoginForm() {
+  const [initialError] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const err = params.get("error");
+      if (err) {
+        return decodeURIComponent(err);
+      }
+    }
+    return null;
+  });
+
+  if (isClerkEnabled) {
+    return <ClerkLoginForm initialError={initialError} />;
+  }
+
+  return <SupabaseLoginForm initialError={initialError} />;
 }
