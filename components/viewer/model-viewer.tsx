@@ -58,8 +58,8 @@ export function ModelViewer({
   const [showPresets, setShowPresets] = useState(false);
 
   // Callbacks hooked into the active Three.js instance
-  const controlsRef = useRef<any>(null);
-  const objectRef = useRef<any>(null);
+  const controlsRef = useRef<{ autoRotate?: boolean } | null>(null);
+  const objectRef = useRef<unknown>(null);
   const resetCameraRef = useRef<(() => void) | null>(null);
   const rotateObjectRef = useRef<((axis: "x" | "y", angle: number) => void) | null>(null);
   const updateMaterialRef = useRef<((newPreset: MaterialPreset) => void) | null>(null);

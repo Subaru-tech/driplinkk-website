@@ -54,7 +54,7 @@ const clerkHandler = isClerkConfigured
 export async function proxy(request: NextRequest, event?: unknown) {
   if (clerkHandler) {
     try {
-      return await clerkHandler(request, event as any);
+      return await clerkHandler(request, event as Parameters<typeof clerkHandler>[1]);
     } catch (err) {
       console.error("Proxy Clerk handler error:", err);
       return handleSupabaseRefresh(request);

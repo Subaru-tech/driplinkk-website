@@ -4,7 +4,7 @@ import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
+import { Show, UserButton } from "@clerk/nextjs";
 import { ButtonLink } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Wordmark } from "@/components/marketing/wordmark";
@@ -96,22 +96,12 @@ export function SiteNav() {
           {isClerkEnabled ? (
             <>
               <Show when="signed-out">
-                <SignInButton mode="modal">
-                  <button
-                    type="button"
-                    className="inline-flex h-8 items-center justify-center rounded-[var(--radius-control)] px-3 text-xs font-medium text-muted transition-colors hover:bg-raised hover:text-fg"
-                  >
-                    Log In
-                  </button>
-                </SignInButton>
-                <SignUpButton mode="modal">
-                  <button
-                    type="button"
-                    className="inline-flex h-8 items-center justify-center rounded-[var(--radius-control)] bg-accent px-3 text-xs font-medium text-white transition-opacity hover:opacity-90"
-                  >
-                    Sign Up
-                  </button>
-                </SignUpButton>
+                <ButtonLink href="/login" variant="ghost" size="sm">
+                  Log In
+                </ButtonLink>
+                <ButtonLink href="/signup" variant="primary" size="sm">
+                  Sign Up
+                </ButtonLink>
               </Show>
               <Show when="signed-in">
                 <ButtonLink href="/dashboard" variant="ghost" size="sm">
@@ -186,24 +176,24 @@ export function SiteNav() {
             {isClerkEnabled ? (
               <>
                 <Show when="signed-out">
-                  <SignInButton mode="modal">
-                    <button
-                      type="button"
-                      onClick={closeMenu}
-                      className="inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-control)] border border-line-control bg-raised font-sans text-sm font-medium text-fg"
-                    >
-                      Log In
-                    </button>
-                  </SignInButton>
-                  <SignUpButton mode="modal">
-                    <button
-                      type="button"
-                      onClick={closeMenu}
-                      className="inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-control)] bg-accent font-sans text-sm font-medium text-white"
-                    >
-                      Sign Up
-                    </button>
-                  </SignUpButton>
+                  <ButtonLink
+                    href="/login"
+                    variant="secondary"
+                    size="lg"
+                    className="w-full"
+                    onClick={closeMenu}
+                  >
+                    Log In
+                  </ButtonLink>
+                  <ButtonLink
+                    href="/signup"
+                    variant="primary"
+                    size="lg"
+                    className="w-full"
+                    onClick={closeMenu}
+                  >
+                    Sign Up
+                  </ButtonLink>
                 </Show>
                 <Show when="signed-in">
                   <div className="flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-surface p-3">
