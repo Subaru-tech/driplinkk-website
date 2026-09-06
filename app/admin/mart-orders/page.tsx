@@ -34,7 +34,7 @@ export default async function AdminMartOrdersPage({
         </p>
       </div>
 
-      {/* Filter Tabs — Horizontal swipe on mobile, wrapped on larger screens */}
+      {/* Filter Tabs — Horizontal swipe on phone, wrapped on tablet/desktop */}
       <div className="flex items-center gap-1.5 overflow-x-auto rounded-[var(--radius-control)] border border-line bg-surface p-1.5 scrollbar-none sm:flex-wrap">
         {STATUS_FILTERS.map((s) => {
           const isActive = currentStatus.toLowerCase() === s.toLowerCase();
@@ -67,8 +67,8 @@ export default async function AdminMartOrdersPage({
         </Card>
       ) : (
         <>
-          {/* Desktop Table (md+) */}
-          <div className="hidden md:block">
+          {/* Desktop & iPad Pro Landscape Table (lg+) */}
+          <div className="hidden lg:block">
             <Card className="overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
@@ -158,43 +158,45 @@ export default async function AdminMartOrdersPage({
             </Card>
           </div>
 
-          {/* Mobile Stacked Cards (< md) */}
-          <div className="flex flex-col gap-3.5 md:hidden">
+          {/* Mobile & iPad/Tablet Cards (< lg: 1 col on mobile, 2 cols on tablet/iPad) */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:hidden">
             {orders.map((order) => (
-              <Card key={order.id} className="flex flex-col gap-3.5 p-4">
-                {/* Header row: Reference & Status */}
-                <div className="flex items-center justify-between gap-2 border-b border-line pb-3">
-                  <span className="font-mono text-xs font-semibold text-accent">
-                    {order.reference}
-                  </span>
-                  <OrderStatusPill status={order.status} />
-                </div>
-
-                {/* Model & Customer */}
-                <div className="flex flex-col gap-1">
-                  <p className="font-medium text-fg">{order.model_name}</p>
-                  <p className="text-xs text-muted">
-                    Buyer:{" "}
-                    <span className="font-medium text-fg">
-                      {order.buyer?.full_name ?? "Customer"}
+              <Card key={order.id} className="flex flex-col justify-between gap-3.5 p-4">
+                <div className="flex flex-col gap-3">
+                  {/* Header row: Reference & Status */}
+                  <div className="flex items-center justify-between gap-2 border-b border-line pb-3">
+                    <span className="font-mono text-xs font-semibold text-accent">
+                      {order.reference}
                     </span>
-                  </p>
-                  {order.shipping_address ? (
-                    <p className="mt-1 text-xs text-muted whitespace-pre-line">
-                      📍 {order.shipping_address}
-                    </p>
-                  ) : null}
-                </div>
-
-                {/* Pricing & Date */}
-                <div className="flex items-center justify-between border-t border-line pt-2.5 text-xs">
-                  <div>
-                    <span className="text-muted">Total: </span>
-                    <span className="font-mono font-medium text-fg">
-                      {formatCurrency(order.total_inr)}
-                    </span>
+                    <OrderStatusPill status={order.status} />
                   </div>
-                  <div className="text-muted">{formatDate(order.created_at)}</div>
+
+                  {/* Model & Customer */}
+                  <div className="flex flex-col gap-1">
+                    <p className="font-medium text-fg">{order.model_name}</p>
+                    <p className="text-xs text-muted">
+                      Buyer:{" "}
+                      <span className="font-medium text-fg">
+                        {order.buyer?.full_name ?? "Customer"}
+                      </span>
+                    </p>
+                    {order.shipping_address ? (
+                      <p className="mt-1 text-xs text-muted whitespace-pre-line">
+                        📍 {order.shipping_address}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  {/* Pricing & Date */}
+                  <div className="flex items-center justify-between border-t border-line pt-2.5 text-xs">
+                    <div>
+                      <span className="text-muted">Total: </span>
+                      <span className="font-mono font-medium text-fg">
+                        {formatCurrency(order.total_inr)}
+                      </span>
+                    </div>
+                    <div className="text-muted">{formatDate(order.created_at)}</div>
+                  </div>
                 </div>
 
                 {/* Fulfillment section */}

@@ -39,8 +39,8 @@ export default async function AdminListingsPage() {
         </Card>
       ) : (
         <>
-          {/* Desktop Table (md+) */}
-          <div className="hidden md:block">
+          {/* Desktop & iPad Pro Landscape Table (lg+) */}
+          <div className="hidden lg:block">
             <Card className="overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
@@ -118,46 +118,48 @@ export default async function AdminListingsPage() {
             </Card>
           </div>
 
-          {/* Mobile Stacked Cards (< md) */}
-          <div className="flex flex-col gap-3 md:hidden">
+          {/* Mobile & iPad/Tablet Cards (< lg: 1 col on mobile, 2 cols on tablet/iPad) */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:hidden">
             {listings.map((listing) => (
-              <Card key={listing.id} className="flex flex-col gap-3.5 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="relative size-14 shrink-0 overflow-hidden rounded-[var(--radius-control)] border border-line bg-raised">
-                    {listing.thumbnail_url ? (
-                      <Image
-                        src={listing.thumbnail_url}
-                        alt=""
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="grid size-full place-items-center text-muted">
-                        <Package className="size-6" />
-                      </div>
-                    )}
+              <Card key={listing.id} className="flex flex-col justify-between gap-4 p-4">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="relative size-14 shrink-0 overflow-hidden rounded-[var(--radius-control)] border border-line bg-raised">
+                      {listing.thumbnail_url ? (
+                        <Image
+                          src={listing.thumbnail_url}
+                          alt=""
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="grid size-full place-items-center text-muted">
+                          <Package className="size-6" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-fg">{listing.title}</p>
+                      <p className="font-mono text-xs text-muted">/{listing.slug}</p>
+                      <p className="mt-1 text-xs text-muted">
+                        Seller:{" "}
+                        <span className="text-fg">
+                          {listing.seller?.studio_name ?? "Independent Seller"}
+                        </span>
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-fg">{listing.title}</p>
-                    <p className="font-mono text-xs text-muted">/{listing.slug}</p>
-                    <p className="mt-1 text-xs text-muted">
-                      Seller:{" "}
-                      <span className="text-fg">
-                        {listing.seller?.studio_name ?? "Independent Seller"}
-                      </span>
-                    </p>
-                  </div>
-                </div>
 
-                <div className="flex items-center justify-between border-t border-line pt-3 text-xs">
-                  <div>
-                    <span className="text-muted">Price: </span>
-                    <span className="font-mono font-medium text-fg">
-                      {formatCurrency(listing.price_inr)}
-                    </span>
+                  <div className="flex items-center justify-between border-t border-line pt-3 text-xs">
+                    <div>
+                      <span className="text-muted">Price: </span>
+                      <span className="font-mono font-medium text-fg">
+                        {formatCurrency(listing.price_inr)}
+                      </span>
+                    </div>
+                    <div className="text-muted">Submitted {formatDate(listing.created_at)}</div>
                   </div>
-                  <div className="text-muted">Submitted {formatDate(listing.created_at)}</div>
                 </div>
 
                 <div className="border-t border-line pt-3">
