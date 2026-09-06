@@ -7,7 +7,7 @@ import { Field, Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 
-import { deleteUserAccount } from "@/lib/actions/account-actions";
+import { deleteUserAccount } from "@/driplink-web-backend/actions/account";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 /**

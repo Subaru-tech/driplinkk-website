@@ -3,9 +3,8 @@ import { redirect } from "next/navigation";
 import { AccountMenu } from "@/components/dashboard/account-menu";
 import { CreditChip } from "@/components/dashboard/credit-chip";
 import { DashboardShell, SIDEBAR_COOKIE } from "@/components/dashboard/dashboard-shell";
-import { getProfile, getSellerProfile } from "@/lib/queries";
+import { getProfile, getSellerProfile, getUnifiedUser, isClerkConfigured } from "@/driplink-web-backend";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { getUnifiedUser, isClerkConfigured } from "@/lib/clerk-supabase";
 
 /**
  * Never prerender or cache anything under /dashboard. Without this, the pages

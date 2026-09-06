@@ -2,9 +2,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AccountMenu } from "@/components/dashboard/account-menu";
 import { DashboardShell, SIDEBAR_COOKIE } from "@/components/dashboard/dashboard-shell";
-import { getProfile, getSellerProfile } from "@/lib/queries";
+import { getProfile, getSellerProfile, getUnifiedUser, isClerkConfigured } from "@/driplink-web-backend";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { getUnifiedUser, isClerkConfigured } from "@/lib/clerk-supabase";
 import { StartSelling } from "@/components/seller/start-selling";
 import { StatusPill } from "@/components/ui/status-pill";
 

@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/toast";
 import { formatCurrency } from "@/lib/format";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
-import { claimFreeListing } from "@/lib/actions/library-actions";
+import { claimFreeListing } from "@/driplink-web-backend/actions/library";
 
 /**
  * The one thing a visitor does on a model page.

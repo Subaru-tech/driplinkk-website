@@ -4,8 +4,7 @@ import { DangerZone } from "@/components/dashboard/danger-zone";
 import { PasswordSection } from "@/components/dashboard/password-section";
 import { ProfileSection } from "@/components/dashboard/profile-section";
 import { SessionsSection } from "@/components/dashboard/sessions-section";
-import { getProfile } from "@/lib/queries";
-import { getUnifiedUser } from "@/lib/clerk-supabase";
+import { getProfile, getUnifiedUser } from "@/driplink-web-backend";
 
 export const metadata: Metadata = { title: "Account" };
 

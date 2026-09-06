@@ -8,8 +8,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status-pill";
 import { formatDate } from "@/lib/format";
 import { CATEGORIES, LICENSES } from "@/lib/marketplace";
-import { getLibraryEntry, getPublicListing } from "@/lib/queries";
-import { getUnifiedUser } from "@/lib/clerk-supabase";
+import { getLibraryEntry, getPublicListing, getUnifiedUser } from "@/driplink-web-backend";
 
 export const dynamic = "force-dynamic";
 
