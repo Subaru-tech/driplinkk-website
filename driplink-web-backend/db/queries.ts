@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getSupabaseServerClient } from "@/driplink-web-backend/db/client";
+import { getSupabaseServerClient, getSupabaseServiceClient } from "@/driplink-web-backend/db/client";
 import { getUnifiedUser, isClerkConfigured, syncClerkProfile } from "@/driplink-web-backend/auth/clerk";
 import { LISTING_SORTS, type Category, type ListingSort } from "@/lib/marketplace";
 import type {
@@ -122,13 +122,13 @@ export async function getModels(
 }
 
 export async function getMartOrders(limit?: number): Promise<QueryResult<MartVendorOrder[]>> {
-  const supabase = await getSupabaseServerClient();
-  if (!supabase) return empty([]);
+  const serviceSupabase = getSupabaseServiceClient();
+  if (!serviceSupabase) return empty([]);
 
   const user = await getUnifiedUser();
   if (!user) return empty([]);
 
-  const { data, error } = await supabase.rpc("get_mart_orders_for_user", {
+  const { data, error } = await serviceSupabase.rpc("get_mart_orders_for_user", {
     p_user_id: user.id,
     p_role: "buyer",
   });
@@ -139,13 +139,13 @@ export async function getMartOrders(limit?: number): Promise<QueryResult<MartVen
 }
 
 export async function getVendorOrders(limit?: number): Promise<QueryResult<MartVendorOrder[]>> {
-  const supabase = await getSupabaseServerClient();
-  if (!supabase) return empty([]);
+  const serviceSupabase = getSupabaseServiceClient();
+  if (!serviceSupabase) return empty([]);
 
   const user = await getUnifiedUser();
   if (!user) return empty([]);
 
-  const { data, error } = await supabase.rpc("get_mart_orders_for_user", {
+  const { data, error } = await serviceSupabase.rpc("get_mart_orders_for_user", {
     p_user_id: user.id,
     p_role: "vendor",
   });
@@ -156,14 +156,14 @@ export async function getVendorOrders(limit?: number): Promise<QueryResult<MartV
 }
 
 export async function getMartOrder(id: string): Promise<QueryResult<MartVendorOrder | null>> {
-  const supabase = await getSupabaseServerClient();
-  if (!supabase) return empty(null);
+  const serviceSupabase = getSupabaseServiceClient();
+  if (!serviceSupabase) return empty(null);
 
   const user = await getUnifiedUser();
   if (!user) return empty(null);
 
   // Check buyer orders first
-  const { data: buyerOrders } = await supabase.rpc("get_mart_orders_for_user", {
+  const { data: buyerOrders } = await serviceSupabase.rpc("get_mart_orders_for_user", {
     p_user_id: user.id,
     p_role: "buyer",
   });
@@ -174,7 +174,7 @@ export async function getMartOrder(id: string): Promise<QueryResult<MartVendorOr
   }
 
   // Check vendor orders
-  const { data: vendorOrders } = await supabase.rpc("get_mart_orders_for_user", {
+  const { data: vendorOrders } = await serviceSupabase.rpc("get_mart_orders_for_user", {
     p_user_id: user.id,
     p_role: "vendor",
   });
@@ -511,15 +511,17 @@ export type AdminListing = Listing & {
 };
 
 export async function getAdminPendingListings(): Promise<QueryResult<AdminListing[]>> {
+  const serviceSupabase = getSupabaseServiceClient();
   const supabase = await getSupabaseServerClient();
-  if (!supabase) return empty([]);
+  const client = serviceSupabase ?? supabase;
+  if (!client) return empty([]);
 
-  const { data: rpcData, error: rpcError } = await supabase.rpc("admin_get_pending_listings");
+  const { data: rpcData, error: rpcError } = await client.rpc("admin_get_pending_listings");
   if (!rpcError && rpcData) {
     return { data: rpcData as AdminListing[], backendReady: true };
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("listings")
     .select(`${LISTING_COLUMNS}, seller:seller_profiles(studio_name, slug)`)
     .in("status", ["pending", "in_review"])
@@ -539,10 +541,12 @@ export type AdminMartOrder = MartOrder & {
 };
 
 export async function getAdminMartOrders(statusFilter?: string): Promise<QueryResult<AdminMartOrder[]>> {
+  const serviceSupabase = getSupabaseServiceClient();
   const supabase = await getSupabaseServerClient();
-  if (!supabase) return empty([]);
+  const client = serviceSupabase ?? supabase;
+  if (!client) return empty([]);
 
-  const { data: rpcData, error: rpcError } = await supabase.rpc("admin_get_mart_orders", {
+  const { data: rpcData, error: rpcError } = await client.rpc("admin_get_mart_orders", {
     p_status: statusFilter && statusFilter.toLowerCase() !== "all" ? statusFilter : null,
   });
 
@@ -550,7 +554,7 @@ export async function getAdminMartOrders(statusFilter?: string): Promise<QueryRe
     return { data: rpcData as AdminMartOrder[], backendReady: true };
   }
 
-  let query = supabase
+  let query = client
     .from("mart_orders")
     .select(`
       id,
@@ -847,23 +851,18 @@ export async function isModelAcquired(
   return Boolean(data);
 }
 
-export async function getUserAcquiredModels(
-  userId?: string
-): Promise<QueryResult<AcquiredModel[]>> {
-  const supabase = await getSupabaseServerClient();
-  if (!supabase) return empty([]);
+export async function getUserAcquiredModels(): Promise<QueryResult<AcquiredModel[]>> {
+  const serviceSupabase = getSupabaseServiceClient();
+  if (!serviceSupabase) return empty([]);
 
-  let targetUserId = userId;
-  if (!targetUserId) {
-    const user = await getUnifiedUser();
-    if (!user) return empty([]);
-    targetUserId = user.id;
-  }
+  // Strictly server-verified session: never trust a client-supplied user id
+  const user = await getUnifiedUser();
+  if (!user) return empty([]);
 
   try {
-    const { data: rpcRows, error: rpcError } = await supabase.rpc(
+    const { data: rpcRows, error: rpcError } = await serviceSupabase.rpc(
       "get_user_model_acquisitions",
-      { p_user_id: targetUserId }
+      { p_user_id: user.id }
     );
 
     if (!rpcError && rpcRows) {
@@ -896,7 +895,7 @@ export async function getUserAcquiredModels(
       return { data: models, backendReady: true };
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await serviceSupabase
       .from("model_acquisitions")
       .select(`
         id,
@@ -913,7 +912,7 @@ export async function getUserAcquiredModels(
           seller:profiles!models_seller_user_id_fkey(full_name)
         )
       `)
-      .eq("user_id", targetUserId)
+      .eq("user_id", user.id)
       .order("acquired_at", { ascending: false });
 
     if (error || !data) return empty([]);
@@ -1200,14 +1199,16 @@ export async function getMyFreelanceProvider(): Promise<QueryResult<Provider | n
 }
 
 export async function getBuyerFreelanceRequests(): Promise<QueryResult<FreelanceRequest[]>> {
+  const serviceSupabase = getSupabaseServiceClient();
   const supabase = await getSupabaseServerClient();
-  if (!supabase) return empty([]);
+  const client = serviceSupabase ?? supabase;
+  if (!client) return empty([]);
 
   const user = await getUnifiedUser();
   if (!user) return empty([]);
 
   try {
-    const { data: rpcRows, error: rpcErr } = await supabase.rpc("get_freelance_requests_for_user", {
+    const { data: rpcRows, error: rpcErr } = await client.rpc("get_freelance_requests_for_user", {
       p_user_id: user.id,
       p_role: "buyer",
     });
@@ -1253,7 +1254,7 @@ export async function getBuyerFreelanceRequests(): Promise<QueryResult<Freelance
       return { data: requests, backendReady: true };
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from("freelance_requests")
       .select("id, buyer_user_id, freelancer_provider_id, brief, reference_file_paths, agreed_price, status, final_file_path, created_at, updated_at")
       .eq("buyer_user_id", user.id)
@@ -1268,14 +1269,16 @@ export async function getBuyerFreelanceRequests(): Promise<QueryResult<Freelance
 }
 
 export async function getFreelancerIncomingRequests(): Promise<QueryResult<FreelanceRequest[]>> {
+  const serviceSupabase = getSupabaseServiceClient();
   const supabase = await getSupabaseServerClient();
-  if (!supabase) return empty([]);
+  const client = serviceSupabase ?? supabase;
+  if (!client) return empty([]);
 
   const user = await getUnifiedUser();
   if (!user) return empty([]);
 
   try {
-    const { data: rpcRows, error: rpcErr } = await supabase.rpc("get_freelance_requests_for_user", {
+    const { data: rpcRows, error: rpcErr } = await client.rpc("get_freelance_requests_for_user", {
       p_user_id: user.id,
       p_role: "freelancer",
     });

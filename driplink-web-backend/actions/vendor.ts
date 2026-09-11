@@ -3,7 +3,7 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
 import { getUnifiedUser } from "@/driplink-web-backend/auth/clerk";
-import { getSupabaseServerClient } from "@/driplink-web-backend/db/client";
+import { getSupabaseServerClient, getSupabaseServiceClient } from "@/driplink-web-backend/db/client";
 import type { Provider, VendorProfile } from "@/lib/types";
 
 export type ApplyVendorInput = {
@@ -32,8 +32,8 @@ export async function applyVendor(
     return { success: false, error: "You must be signed in to apply as a print vendor." };
   }
 
-  const supabase = await getSupabaseServerClient();
-  if (!supabase) {
+  const serviceSupabase = getSupabaseServiceClient();
+  if (!serviceSupabase) {
     return { success: false, error: "Database backend is not connected." };
   }
 
@@ -52,7 +52,7 @@ export async function applyVendor(
     return { success: false, error: "Please select at least one supported material." };
   }
 
-  const { data, error } = await supabase.rpc("apply_vendor_profile", {
+  const { data, error } = await serviceSupabase.rpc("apply_vendor_profile", {
     p_user_id: user.id,
     p_business_name: cleanName,
     p_location: cleanLocation,
@@ -124,12 +124,12 @@ export async function respondToMartOrderAction(
     return { success: false, error: "You must be signed in to perform this action." };
   }
 
-  const supabase = await getSupabaseServerClient();
-  if (!supabase) {
+  const serviceSupabase = getSupabaseServiceClient();
+  if (!serviceSupabase) {
     return { success: false, error: "Database backend is not connected." };
   }
 
-  const { data, error } = await supabase.rpc("respond_to_mart_order", {
+  const { data, error } = await serviceSupabase.rpc("respond_to_mart_order", {
     p_user_id: user.id,
     p_order_id: orderId,
     p_action: action,

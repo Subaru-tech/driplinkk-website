@@ -1,7 +1,7 @@
 import "server-only";
 
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { getSupabaseServerClient, getCurrentUser as getSupabaseUser } from "@/driplink-web-backend/db/client";
+import { getSupabaseServerClient, getSupabaseServiceClient, getCurrentUser as getSupabaseUser } from "@/driplink-web-backend/db/client";
 import type { Profile } from "@/lib/types";
 
 export const isClerkConfigured = Boolean(
@@ -31,8 +31,10 @@ export async function syncClerkProfile(): Promise<Profile | null> {
     const clerkUser = await currentUser();
     if (!clerkUser) return null;
 
+    const serviceSupabase = getSupabaseServiceClient();
     const supabase = await getSupabaseServerClient();
-    if (!supabase) return null;
+    const client = serviceSupabase ?? supabase;
+    if (!client) return null;
 
     const email = clerkUser.emailAddresses?.[0]?.emailAddress ?? null;
     const fullName =
@@ -42,8 +44,8 @@ export async function syncClerkProfile(): Promise<Profile | null> {
       "Creator";
     const avatarUrl = clerkUser.imageUrl || null;
 
-    // 1. Try atomic security definer RPC function first
-    const { data: rpcProfile, error: rpcError } = await supabase.rpc("sync_clerk_user_profile", {
+    // 1. Try atomic security definer RPC function first with service client
+    const { data: rpcProfile, error: rpcError } = await client.rpc("sync_clerk_user_profile", {
       p_clerk_id: userId,
       p_full_name: fullName,
       p_avatar_url: avatarUrl,
@@ -54,7 +56,7 @@ export async function syncClerkProfile(): Promise<Profile | null> {
     }
 
     // 2. Fallback: check if profile already exists for this Clerk ID
-    const { data: existing } = await supabase
+    const { data: existing } = await client
       .from("profiles")
       .select("*")
       .eq("clerk_id", userId)
@@ -65,7 +67,7 @@ export async function syncClerkProfile(): Promise<Profile | null> {
     }
 
     // 3. Fallback insert new profile
-    const { data: created, error } = await supabase
+    const { data: created, error } = await client
       .from("profiles")
       .insert({
         clerk_id: userId,

@@ -3,7 +3,7 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
 import { getUnifiedUser } from "@/driplink-web-backend/auth/clerk";
-import { getSupabaseServerClient } from "@/driplink-web-backend/db/client";
+import { getSupabaseServerClient, getSupabaseServiceClient } from "@/driplink-web-backend/db/client";
 import { calculateStlVolume, calculatePartWeight } from "@/driplink-web-backend/utils/mesh-calc";
 import type { VendorQuoteItem } from "@/lib/types";
 
@@ -40,7 +40,9 @@ export async function calculateMeshQuotes(
 
   const user = await getUnifiedUser();
   const supabase = await getSupabaseServerClient();
-  if (!supabase) {
+  const serviceSupabase = getSupabaseServiceClient() ?? supabase;
+
+  if (!supabase || !serviceSupabase) {
     return { success: false, error: "Database backend is not connected." };
   }
 
@@ -68,7 +70,7 @@ export async function calculateMeshQuotes(
   const storagePath = `mart-quotes/${userFolder}/${Date.now()}-${cleanName}`;
 
   try {
-    const { error: uploadErr } = await supabase.storage
+    const { error: uploadErr } = await serviceSupabase.storage
       .from("model-files")
       .upload(storagePath, file, { contentType: "application/octet-stream" });
 
@@ -79,10 +81,10 @@ export async function calculateMeshQuotes(
     // Non-blocking for quoting
   }
 
-  // 3. Record quote_requests row if authenticated
+  // 3. Record quote_requests row if authenticated (service-role client)
   let quoteRequestId: string | null = null;
   if (user) {
-    const { data: qrId, error: qrErr } = await supabase.rpc("create_quote_request", {
+    const { data: qrId, error: qrErr } = await serviceSupabase.rpc("create_quote_request", {
       p_user_id: user.id,
       p_file_path: storagePath,
       p_material: material,
@@ -147,8 +149,8 @@ export async function createMartOrderAction(
     return { success: false, error: "You must be signed in to place an order." };
   }
 
-  const supabase = await getSupabaseServerClient();
-  if (!supabase) {
+  const serviceSupabase = getSupabaseServiceClient();
+  if (!serviceSupabase) {
     return { success: false, error: "Database backend is not connected." };
   }
 
@@ -156,7 +158,7 @@ export async function createMartOrderAction(
 
   // If quoteRequestId was not created (e.g. quoted while logged out), create it now
   if (!finalQuoteRequestId) {
-    const { data: qrId, error: qrErr } = await supabase.rpc("create_quote_request", {
+    const { data: qrId, error: qrErr } = await serviceSupabase.rpc("create_quote_request", {
       p_user_id: user.id,
       p_file_path: input.filePath,
       p_material: input.material,
@@ -170,8 +172,8 @@ export async function createMartOrderAction(
     finalQuoteRequestId = qrId as string;
   }
 
-  // Atomic order creation via RPC
-  const { data: orderId, error: orderErr } = await supabase.rpc("create_mart_order", {
+  // Atomic order creation via privileged RPC
+  const { data: orderId, error: orderErr } = await serviceSupabase.rpc("create_mart_order", {
     p_buyer_user_id: user.id,
     p_quote_request_id: finalQuoteRequestId,
     p_provider_id: input.providerId,

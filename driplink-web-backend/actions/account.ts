@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { clerkClient } from "@clerk/nextjs/server";
 import { getUnifiedUser, isClerkConfigured } from "@/driplink-web-backend/auth/clerk";
-import { getSupabaseServerClient } from "@/driplink-web-backend/db/client";
+import { getSupabaseServerClient, getSupabaseServiceClient } from "@/driplink-web-backend/db/client";
 
 export type UpdateProfileResult = {
   success: boolean;
@@ -25,16 +25,18 @@ export async function updateUserProfile({
     return { success: false, error: "You must be signed in to update your profile." };
   }
 
+  const serviceSupabase = getSupabaseServiceClient();
   const supabase = await getSupabaseServerClient();
-  if (!supabase) {
+  const client = serviceSupabase ?? supabase;
+  if (!client) {
     return { success: false, error: "Database backend is not connected." };
   }
 
   const trimmedName = fullName.trim();
 
   if (user.source === "clerk") {
-    // 1. Update Supabase profile via the Security Definer RPC
-    const { error: rpcErr } = await supabase.rpc("sync_clerk_user_profile", {
+    // 1. Update Supabase profile via the Security Definer RPC with service client
+    const { error: rpcErr } = await client.rpc("sync_clerk_user_profile", {
       p_clerk_id: user.authId,
       p_full_name: trimmedName,
       p_avatar_url: avatarUrl ?? user.avatarUrl ?? null,
@@ -62,7 +64,7 @@ export async function updateUserProfile({
     }
   } else {
     // Supabase native auth
-    const { error } = await supabase
+    const { error } = await client
       .from("profiles")
       .update({
         full_name: trimmedName,

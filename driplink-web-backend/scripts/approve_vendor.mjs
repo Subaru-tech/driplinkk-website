@@ -42,7 +42,9 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: false }
+});
 
 const DEFAULT_PRICING_RULES = [
   { material: "pla", price_per_gram: 2.4, min_order_price: 200, active: true },

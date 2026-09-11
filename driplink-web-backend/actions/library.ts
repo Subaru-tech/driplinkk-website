@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getUnifiedUser } from "@/driplink-web-backend/auth/clerk";
-import { getSupabaseServerClient } from "@/driplink-web-backend/db/client";
+import { getSupabaseServerClient, getSupabaseServiceClient } from "@/driplink-web-backend/db/client";
 
 export type ClaimResult = {
   success: boolean;
@@ -28,14 +28,15 @@ export async function claimFreeModel(modelId: string): Promise<ClaimResult> {
     return { success: false, error: "Please sign in to add this model to your library." };
   }
 
+  const serviceSupabase = getSupabaseServiceClient();
   const supabase = await getSupabaseServerClient();
-  if (!supabase) {
+  if (!serviceSupabase || !supabase) {
     return { success: false, error: "Database backend is not connected." };
   }
 
   try {
-    // 1. Try atomic PostgreSQL RPC function
-    const { data: rpcRes, error: rpcErr } = await supabase.rpc("claim_model_acquisition", {
+    // 1. Try atomic PostgreSQL RPC function with service role
+    const { data: rpcRes, error: rpcErr } = await serviceSupabase.rpc("claim_model_acquisition", {
       p_user_id: user.id,
       p_model_id: modelId,
     });
@@ -136,15 +137,16 @@ export async function getModelDownloadUrl(modelId: string): Promise<DownloadUrlR
     return { success: false, error: "Please sign in to download this model." };
   }
 
+  const serviceSupabase = getSupabaseServiceClient();
   const supabase = await getSupabaseServerClient();
-  if (!supabase) {
+  if (!serviceSupabase || !supabase) {
     return { success: false, error: "Database backend is not connected." };
   }
 
   try {
-    // 1. Verify user acquired this model or owns it
+    // 1. Verify user acquired this model or owns it (privileged check)
     let hasAccess = false;
-    const { data: rpcAccess, error: rpcAccessErr } = await supabase.rpc(
+    const { data: rpcAccess, error: rpcAccessErr } = await serviceSupabase.rpc(
       "can_user_access_model_file",
       { p_user_id: user.id, p_model_id: modelId }
     );

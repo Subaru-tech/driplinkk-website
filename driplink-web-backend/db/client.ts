@@ -34,6 +34,32 @@ export async function getSupabaseServerClient(): Promise<SupabaseClient | null> 
   });
 }
 
+import { createClient } from "@supabase/supabase-js";
+
+let serviceClient: SupabaseClient | null = null;
+
+/**
+ * Privileged server-only Supabase client holding the service_role key.
+ * Used exclusively by server actions to call locked-down SECURITY DEFINER RPCs
+ * after server-side Clerk authentication has already verified the caller.
+ */
+export function getSupabaseServiceClient(): SupabaseClient | null {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!SUPABASE_URL || !serviceKey) {
+    console.error("SUPABASE_SERVICE_ROLE_KEY is not configured on the server.");
+    return null;
+  }
+
+  serviceClient ??= createClient(SUPABASE_URL, serviceKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+
+  return serviceClient;
+}
+
 /**
  * The signed-in user, or null.
  *
@@ -49,3 +75,4 @@ export async function getCurrentUser(): Promise<User | null> {
   if (error) return null;
   return data.user;
 }
+

@@ -3,7 +3,7 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
 import { getUnifiedUser } from "@/driplink-web-backend/auth/clerk";
-import { getSupabaseServerClient } from "@/driplink-web-backend/db/client";
+import { getSupabaseServerClient, getSupabaseServiceClient } from "@/driplink-web-backend/db/client";
 import type { RateType } from "@/lib/types";
 
 export type ApplyFreelancerInput = {
@@ -34,8 +34,8 @@ export async function applyFreelancer(
     return { success: false, error: "You must be signed in to apply as a freelancer." };
   }
 
-  const supabase = await getSupabaseServerClient();
-  if (!supabase) {
+  const serviceSupabase = getSupabaseServiceClient();
+  if (!serviceSupabase) {
     return { success: false, error: "Database backend is not connected." };
   }
 
@@ -61,7 +61,7 @@ export async function applyFreelancer(
     : [];
 
   try {
-    const { data: rpcRes, error: rpcErr } = await supabase.rpc("register_freelancer_profile", {
+    const { data: rpcRes, error: rpcErr } = await serviceSupabase.rpc("register_freelancer_profile", {
       p_user_id: user.id,
       p_display_name: cleanName,
       p_bio: input.bio?.trim() || null,
@@ -116,8 +116,8 @@ export async function submitFreelanceRequest({
     return { success: false, error: "You must be signed in to hire a specialist." };
   }
 
-  const supabase = await getSupabaseServerClient();
-  if (!supabase) {
+  const serviceSupabase = getSupabaseServiceClient();
+  if (!serviceSupabase) {
     return { success: false, error: "Database backend is not connected." };
   }
 
@@ -130,7 +130,7 @@ export async function submitFreelanceRequest({
   }
 
   try {
-    const { data: rpcRes, error: rpcErr } = await supabase.rpc("create_freelance_request", {
+    const { data: rpcRes, error: rpcErr } = await serviceSupabase.rpc("create_freelance_request", {
       p_buyer_user_id: user.id,
       p_freelancer_provider_id: freelancerProviderId,
       p_brief: cleanBrief,
@@ -183,8 +183,8 @@ export async function respondToFreelanceRequest({
     return { success: false, error: "Authentication required." };
   }
 
-  const supabase = await getSupabaseServerClient();
-  if (!supabase) {
+  const serviceSupabase = getSupabaseServiceClient();
+  if (!serviceSupabase) {
     return { success: false, error: "Database backend is not connected." };
   }
 
@@ -197,7 +197,7 @@ export async function respondToFreelanceRequest({
   }
 
   try {
-    const { data: rpcRes, error: rpcErr } = await supabase.rpc("respond_to_freelance_request", {
+    const { data: rpcRes, error: rpcErr } = await serviceSupabase.rpc("respond_to_freelance_request", {
       p_user_id: user.id,
       p_request_id: requestId,
       p_action: action,
