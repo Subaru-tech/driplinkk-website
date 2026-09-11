@@ -14,8 +14,10 @@ import type {
   MarketplaceModel,
   PublicListing,
   MartOrder,
+  MartVendorOrder,
   Model,
   Payout,
+
   Profile,
   Provider,
   Sale,
@@ -119,43 +121,72 @@ export async function getModels(
   return { data: (data as Model[]) ?? [], backendReady: true };
 }
 
-export async function getMartOrders(limit?: number): Promise<QueryResult<MartOrder[]>> {
+export async function getMartOrders(limit?: number): Promise<QueryResult<MartVendorOrder[]>> {
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty([]);
 
   const user = await getUnifiedUser();
   if (!user) return empty([]);
 
-  let query = supabase
-    .from("mart_orders")
-    .select("id, reference, model_name, status, total_inr, created_at, shipping_address")
-    .eq("buyer_id", user.id)
-    .order("created_at", { ascending: false });
+  const { data, error } = await supabase.rpc("get_mart_orders_for_user", {
+    p_user_id: user.id,
+    p_role: "buyer",
+  });
 
-  if (limit) query = query.limit(limit);
-
-  const { data, error } = await query;
-  if (error) return empty([]);
-  return { data: (data as MartOrder[]) ?? [], backendReady: true };
+  if (error || !data) return empty([]);
+  const orders = limit ? (data as MartVendorOrder[]).slice(0, limit) : (data as MartVendorOrder[]);
+  return { data: orders, backendReady: true };
 }
 
-export async function getMartOrder(id: string): Promise<QueryResult<MartOrder | null>> {
+export async function getVendorOrders(limit?: number): Promise<QueryResult<MartVendorOrder[]>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty([]);
+
+  const user = await getUnifiedUser();
+  if (!user) return empty([]);
+
+  const { data, error } = await supabase.rpc("get_mart_orders_for_user", {
+    p_user_id: user.id,
+    p_role: "vendor",
+  });
+
+  if (error || !data) return empty([]);
+  const orders = limit ? (data as MartVendorOrder[]).slice(0, limit) : (data as MartVendorOrder[]);
+  return { data: orders, backendReady: true };
+}
+
+export async function getMartOrder(id: string): Promise<QueryResult<MartVendorOrder | null>> {
   const supabase = await getSupabaseServerClient();
   if (!supabase) return empty(null);
 
   const user = await getUnifiedUser();
   if (!user) return empty(null);
 
-  const { data, error } = await supabase
-    .from("mart_orders")
-    .select("id, reference, model_name, status, total_inr, created_at, shipping_address")
-    .eq("id", id)
-    .eq("buyer_id", user.id)
-    .maybeSingle();
+  // Check buyer orders first
+  const { data: buyerOrders } = await supabase.rpc("get_mart_orders_for_user", {
+    p_user_id: user.id,
+    p_role: "buyer",
+  });
 
-  if (error) return empty(null);
-  return { data: (data as MartOrder) ?? null, backendReady: true };
+  const foundBuyer = ((buyerOrders as MartVendorOrder[]) || []).find((o) => o.id === id);
+  if (foundBuyer) {
+    return { data: foundBuyer, backendReady: true };
+  }
+
+  // Check vendor orders
+  const { data: vendorOrders } = await supabase.rpc("get_mart_orders_for_user", {
+    p_user_id: user.id,
+    p_role: "vendor",
+  });
+
+  const foundVendor = ((vendorOrders as MartVendorOrder[]) || []).find((o) => o.id === id);
+  if (foundVendor) {
+    return { data: foundVendor, backendReady: true };
+  }
+
+  return empty(null);
 }
+
 
 export type LedgerPage = { entries: LedgerEntry[]; total: number };
 
@@ -192,12 +223,13 @@ export async function getActiveOrderCount(): Promise<QueryResult<number>> {
   const { count, error } = await supabase
     .from("mart_orders")
     .select("id", { count: "exact", head: true })
-    .eq("buyer_id", user.id)
-    .in("status", ["Placed", "Confirmed", "Printing", "Shipped"]);
+    .eq("buyer_user_id", user.id)
+    .in("status", ["placed", "accepted", "printing", "shipped"]);
 
   if (error) return empty(0);
   return { data: count ?? 0, backendReady: true };
 }
+
 
 export async function getModelCount(): Promise<QueryResult<number>> {
   const supabase = await getSupabaseServerClient();

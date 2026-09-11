@@ -7,7 +7,9 @@ export {
   type ModelSort,
   getModels,
   getMartOrders,
+  getVendorOrders,
   getMartOrder,
+
   type LedgerPage,
   getLedgerPage,
   getActiveOrderCount,

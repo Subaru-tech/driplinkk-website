@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, ShieldCheck, Store, UserCog, Wrench } from "lucide-react";
+import { Factory, LogOut, ShieldCheck, Store, UserCog, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -104,7 +104,7 @@ export function AccountMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Account menu"
-        className="grid size-8 place-items-center overflow-hidden rounded-full border border-line bg-raised text-xs font-medium text-fg transition-colors hover:border-line-strong"
+        className="grid size-11 min-h-[44px] min-w-[44px] place-items-center overflow-hidden rounded-full border border-line bg-raised text-sm font-medium text-fg transition-colors hover:border-line-strong"
       >
         {avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- avatar comes from Supabase storage at an arbitrary origin
@@ -152,6 +152,16 @@ export function AccountMenu({
           >
             <Wrench className="size-4" aria-hidden="true" />
             Specialist studio
+          </Link>
+
+          <Link
+            href="/dashboard/vendor"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 px-4 py-2.5 text-sm text-muted transition-colors hover:bg-raised hover:text-fg"
+          >
+            <Factory className="size-4" aria-hidden="true" />
+            Vendor hub
           </Link>
 
           {isAdmin ? (

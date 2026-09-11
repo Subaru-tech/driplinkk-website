@@ -151,7 +151,7 @@ export function DashboardShell({
       {/* --------------------------------------------- Mobile tab bar */}
       <nav
         aria-label="Dashboard"
-        className="fixed inset-x-0 bottom-0 z-40 flex border-t border-line bg-canvas/95 backdrop-blur-md lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 flex items-center overflow-x-auto border-t border-line bg-canvas/95 backdrop-blur-md lg:hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
       >
         {navItems.map((item) => {
           const active =
@@ -164,12 +164,12 @@ export function DashboardShell({
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex flex-1 flex-col items-center gap-1 py-2.5 text-xs transition-colors",
-                active ? "text-accent" : "text-muted",
+                "flex min-h-[48px] min-w-[64px] flex-1 shrink-0 flex-col items-center justify-center gap-1 px-2 py-2 text-xs transition-colors",
+                active ? "text-accent font-medium" : "text-muted hover:text-fg",
               )}
             >
               <item.icon className="size-5" aria-hidden="true" />
-              {item.shortLabel}
+              <span className="truncate text-[11px] leading-tight">{item.shortLabel}</span>
             </Link>
           );
         })}

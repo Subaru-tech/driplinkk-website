@@ -5,7 +5,9 @@ import {
   LayoutDashboard,
   LibraryBig,
   Package,
+  Printer,
   ReceiptIndianRupee,
+
   Store,
   Truck,
   UserCog,
@@ -28,11 +30,13 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/library", label: "My Library", shortLabel: "Library", icon: LibraryBig },
   { href: "/dashboard/models", label: "My Models", shortLabel: "Models", icon: Boxes },
   { href: "/dashboard/mart-orders", label: "Mart Orders", shortLabel: "Orders", icon: Truck },
+  { href: "/dashboard/vendor", label: "Vendor Hub", shortLabel: "Vendor", icon: Printer },
   { href: "/dashboard/freelance-requests", label: "Hire Requests", shortLabel: "Hires", icon: Briefcase },
   { href: "/dashboard/freelancer", label: "Specialist Jobs", shortLabel: "Jobs", icon: Wrench },
   { href: "/dashboard/billing", label: "Credits & Billing", shortLabel: "Billing", icon: CreditCard },
   { href: "/dashboard/account", label: "Account", shortLabel: "Account", icon: UserCog },
 ];
+
 
 
 /** The seller side of the house — /seller/*. Same shell, different doors. */

@@ -65,16 +65,27 @@ export const ORDER_TIMELINE: OrderStatus[] = [
   "Delivered",
 ];
 
-const orderTones: Record<OrderStatus, StatusTone> = {
+const orderTones: Record<string, StatusTone> = {
   Placed: "neutral",
+  placed: "neutral",
   Confirmed: "info",
+  accepted: "info",
   Printing: "warning",
+  printing: "warning",
   Shipped: "info",
+  shipped: "info",
   Delivered: "accent",
+  delivered: "accent",
+  Completed: "accent",
+  completed: "accent",
   Cancelled: "danger",
+  cancelled: "danger",
   Failed: "danger",
 };
 
-export function OrderStatusPill({ status }: { status: OrderStatus }) {
-  return <StatusPill tone={orderTones[status]}>{status}</StatusPill>;
+export function OrderStatusPill({ status }: { status: string }) {
+  const tone = orderTones[status] || "neutral";
+  const label = status.charAt(0).toUpperCase() + status.slice(1);
+  return <StatusPill tone={tone}>{label}</StatusPill>;
 }
+

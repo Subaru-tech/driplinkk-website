@@ -14,6 +14,9 @@ export const metadata: Metadata = {
     "Instant multi-vendor print price comparison for any 3D model. Upload your STL, STEP, or 3MF file to get guaranteed upfront pricing from vetted print hubs, tracked to your door.",
 };
 
+export const dynamic = "force-dynamic";
+
+
 const features = [
   {
     icon: Users,
@@ -44,7 +47,11 @@ const flow = [
   { icon: Truck, title: "Delivered", description: "It's printed, checked and shipped to your address." },
 ];
 
-export default function MartPage() {
+import { getUnifiedUser } from "@/driplink-web-backend/auth/clerk";
+
+export default async function MartPage() {
+  const user = await getUnifiedUser();
+
   return (
     <>
       <Hero
@@ -69,8 +76,9 @@ export default function MartPage() {
       />
 
       <Section tone="canvas" className="pt-0">
-        <MartQuoteCalculator />
+        <MartQuoteCalculator isSignedIn={Boolean(user)} />
       </Section>
+
 
       <Section tone="surface">
         <SectionHeading eyebrow="Why Mart" title="The part of printing nobody wants to manage." />

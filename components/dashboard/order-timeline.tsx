@@ -1,33 +1,40 @@
 import { Check, X } from "lucide-react";
-import { ORDER_TIMELINE, type OrderStatus } from "@/components/ui/status-pill";
 import { cn } from "@/lib/cn";
 
+const TIMELINE_STAGES = [
+  { id: "placed", label: "Order Placed" },
+  { id: "accepted", label: "Hub Accepted" },
+  { id: "printing", label: "Printing in Progress" },
+  { id: "shipped", label: "Dispatched & Shipped" },
+  { id: "delivered", label: "Delivered" },
+  { id: "completed", label: "Completed" },
+];
+
 /**
- * Vertical stepper for the order detail view — spec §6.3.
- *
- * Cancelled and Failed sit outside the happy path, so they're rendered as a
- * terminal state rather than being forced onto the ladder.
+ * Vertical stepper for the order detail view — supports lowercase database statuses.
  */
-export function OrderTimeline({ status }: { status: OrderStatus }) {
-  const terminal = status === "Cancelled" || status === "Failed";
-  const currentIndex = terminal ? -1 : ORDER_TIMELINE.indexOf(status);
+export function OrderTimeline({ status }: { status: string }) {
+  const normStatus = status.toLowerCase();
+  const terminal = normStatus === "cancelled" || normStatus === "failed";
+  const stageIds = TIMELINE_STAGES.map((s) => s.id);
+  const currentIndex = terminal ? -1 : stageIds.indexOf(normStatus);
 
   return (
     <ol className="flex flex-col">
-      {ORDER_TIMELINE.map((stage, index) => {
+      {TIMELINE_STAGES.map((stage, index) => {
         const done = !terminal && index < currentIndex;
         const current = !terminal && index === currentIndex;
-        const last = index === ORDER_TIMELINE.length - 1;
+        const last = index === TIMELINE_STAGES.length - 1;
 
         return (
-          <li key={stage} className="flex gap-4">
+          <li key={stage.id} className="flex gap-4">
             <div className="flex flex-col items-center">
               <span
                 className={cn(
                   "grid size-6 shrink-0 place-items-center rounded-full border text-xs",
                   done && "border-accent bg-accent text-accent-contrast",
                   current && "border-accent text-accent",
-                  !done && !current && "border-line text-faint",
+                  !done && !current && "border-line text-faint"
                 )}
               >
                 {done ? <Check className="size-3.5" strokeWidth={3} aria-hidden="true" /> : null}
@@ -38,7 +45,7 @@ export function OrderTimeline({ status }: { status: OrderStatus }) {
               {last ? null : (
                 <span
                   aria-hidden="true"
-                  className={cn("w-px flex-1", done ? "bg-accent" : "bg-line")}
+                  className={cn("w-px flex-1 min-h-6", done ? "bg-accent" : "bg-line")}
                 />
               )}
             </div>
@@ -47,10 +54,10 @@ export function OrderTimeline({ status }: { status: OrderStatus }) {
               <p
                 className={cn(
                   "text-sm",
-                  current ? "font-medium text-fg" : done ? "text-muted" : "text-faint",
+                  current ? "font-medium text-fg" : done ? "text-muted" : "text-faint"
                 )}
               >
-                {stage}
+                {stage.label}
                 {current ? <span className="sr-only"> — current stage</span> : null}
               </p>
             </div>
@@ -63,7 +70,7 @@ export function OrderTimeline({ status }: { status: OrderStatus }) {
           <span className="grid size-6 shrink-0 place-items-center rounded-full border border-danger text-danger">
             <X className="size-3.5" strokeWidth={3} aria-hidden="true" />
           </span>
-          <p className="text-sm font-medium text-danger">{status}</p>
+          <p className="text-sm font-medium text-danger capitalize">{status}</p>
         </li>
       ) : null}
     </ol>

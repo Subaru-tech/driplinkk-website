@@ -230,4 +230,70 @@ export type FreelanceRequest = {
   freelancer_email?: string | null;
 };
 
+/* ------------------------------------------------------------- Vendor side */
+
+export type VendorProfile = {
+  provider_id: string;
+  business_name: string;
+  location: string | null;
+  materials_supported: string[];
+  capacity_notes: string | null;
+  updated_at?: string;
+};
+
+export type VendorPricingRule = {
+  id: string;
+  provider_id: string;
+  material: string;
+  price_per_gram: number;
+  min_order_price: number;
+  active: boolean;
+  created_at?: string;
+};
+
+export type QuoteRequest = {
+  id: string;
+  user_id: string;
+  file_path: string;
+  material: string | null;
+  weight_g: number | null;
+  status: "pending" | "weighed" | "failed";
+  created_at?: string;
+};
+
+export type MartOrderStatus =
+  | "placed"
+  | "accepted"
+  | "printing"
+  | "shipped"
+  | "delivered"
+  | "completed"
+  | "cancelled";
+
+export type VendorQuoteItem = {
+  provider_id: string;
+  business_name: string;
+  location: string | null;
+  price: number;
+  material: string;
+};
+
+export type MartVendorOrder = {
+  id: string;
+  quote_request_id: string;
+  buyer_user_id: string;
+  provider_id: string;
+  price: number;
+  material: string;
+  status: MartOrderStatus;
+  file_path?: string;
+  weight_g?: number;
+  created_at: string;
+  updated_at: string;
+  counterparty_name?: string;
+  counterparty_email?: string | null;
+  counterparty_location?: string | null;
+};
+
+
 
