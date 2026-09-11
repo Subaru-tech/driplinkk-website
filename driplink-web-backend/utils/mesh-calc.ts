@@ -21,11 +21,26 @@ export const MATERIAL_DENSITIES: Record<string, number> = {
   "nylon-cf": 1.15,
 };
 
+export type BoundingBox = {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  minZ: number;
+  maxZ: number;
+  dxMm: number;
+  dyMm: number;
+  dzMm: number;
+  bboxVolumeCm3: number;
+};
+
 export type MeshVolumeResult = {
   volumeMm3: number;
   volumeCm3: number;
   triangleCount: number;
   format: "binary" | "ascii";
+  boundingBox: BoundingBox;
+  invertedNormalsCount?: number;
 };
 
 /**
@@ -71,22 +86,45 @@ function isBinaryStl(buffer: Buffer): boolean {
 }
 
 /**
- * Calculates volume of an STL file from its Buffer.
+ * Calculates volume and bounding geometry of an STL file from its Buffer.
+ * Validates manifoldness and bounding-box plausibility.
  */
 export function calculateStlVolume(buffer: Buffer): MeshVolumeResult {
   if (buffer.length < 84) {
     throw new Error("File too small to be a valid STL model.");
   }
 
+  let minX = Infinity, maxX = -Infinity;
+  let minY = Infinity, maxY = -Infinity;
+  let minZ = Infinity, maxZ = -Infinity;
+
+  const updateBBox = (x: number, y: number, z: number) => {
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+    if (z < minZ) minZ = z;
+    if (z > maxZ) maxZ = z;
+  };
+
   if (isBinaryStl(buffer)) {
     const triangleCount = buffer.readUInt32LE(80);
+    if (triangleCount === 0) {
+      throw new Error("STL file contains 0 triangles.");
+    }
+
     let totalVolume = 0;
+    let invertedNormals = 0;
     let offset = 84;
 
     for (let i = 0; i < triangleCount; i++) {
       if (offset + 50 > buffer.length) break;
 
-      // Skip 12 bytes normal (offset + 0 to + 11)
+      // Stored facet normal
+      const nx = buffer.readFloatLE(offset);
+      const ny = buffer.readFloatLE(offset + 4);
+      const nz = buffer.readFloatLE(offset + 8);
+
       const x1 = buffer.readFloatLE(offset + 12);
       const y1 = buffer.readFloatLE(offset + 16);
       const z1 = buffer.readFloatLE(offset + 20);
@@ -99,6 +137,25 @@ export function calculateStlVolume(buffer: Buffer): MeshVolumeResult {
       const y3 = buffer.readFloatLE(offset + 40);
       const z3 = buffer.readFloatLE(offset + 44);
 
+      updateBBox(x1, y1, z1);
+      updateBBox(x2, y2, z2);
+      updateBBox(x3, y3, z3);
+
+      // Check stored normal alignment if provided (non-zero normal)
+      const normalLenSq = nx * nx + ny * ny + nz * nz;
+      if (normalLenSq > 0.0001) {
+        // Geometric cross product (v2 - v1) x (v3 - v1)
+        const ax = x2 - x1, ay = y2 - y1, az = z2 - z1;
+        const bx = x3 - x1, by = y3 - y1, bz = z3 - z1;
+        const cx = ay * bz - az * by;
+        const cy = az * bx - ax * bz;
+        const cz = ax * by - ay * bx;
+        const dot = nx * cx + ny * cy + nz * cz;
+        if (dot < -1e-6) {
+          invertedNormals++;
+        }
+      }
+
       totalVolume += signedTetrahedralVolume(x1, y1, z1, x2, y2, z2, x3, y3, z3);
       offset += 50;
     }
@@ -106,11 +163,33 @@ export function calculateStlVolume(buffer: Buffer): MeshVolumeResult {
     const volumeMm3 = Math.abs(totalVolume);
     const volumeCm3 = volumeMm3 / 1000.0;
 
+    const dxMm = Math.max(0, maxX - minX);
+    const dyMm = Math.max(0, maxY - minY);
+    const dzMm = Math.max(0, maxZ - minZ);
+    const bboxVolumeCm3 = (dxMm * dyMm * dzMm) / 1000.0;
+
+    // Plausibility verification
+    if (volumeMm3 <= 0 || !Number.isFinite(volumeMm3)) {
+      throw new Error("Calculated mesh volume is zero or non-finite. Ensure the 3D model is a closed, watertight manifold solid.");
+    }
+
+    if (bboxVolumeCm3 > 0 && volumeCm3 > bboxVolumeCm3 * 1.05) {
+      throw new Error("Mesh volume exceeds physical bounding box. Geometry may have self-intersecting or corrupted facets.");
+    }
+
     return {
       volumeMm3,
       volumeCm3,
       triangleCount,
       format: "binary",
+      invertedNormalsCount: invertedNormals,
+      boundingBox: {
+        minX, maxX, minY, maxY, minZ, maxZ,
+        dxMm: Math.round(dxMm * 100) / 100,
+        dyMm: Math.round(dyMm * 100) / 100,
+        dzMm: Math.round(dzMm * 100) / 100,
+        bboxVolumeCm3: Math.round(bboxVolumeCm3 * 100) / 100,
+      },
     };
   } else {
     // ASCII STL parsing
@@ -123,11 +202,12 @@ export function calculateStlVolume(buffer: Buffer): MeshVolumeResult {
     let triangleCount = 0;
 
     while ((match = vertexRegex.exec(text)) !== null) {
-      vertices.push([
-        parseFloat(match[1]),
-        parseFloat(match[2]),
-        parseFloat(match[3]),
-      ]);
+      const vx = parseFloat(match[1]);
+      const vy = parseFloat(match[2]);
+      const vz = parseFloat(match[3]);
+
+      updateBBox(vx, vy, vz);
+      vertices.push([vx, vy, vz]);
 
       if (vertices.length === 3) {
         const [v1, v2, v3] = vertices;
@@ -141,14 +221,34 @@ export function calculateStlVolume(buffer: Buffer): MeshVolumeResult {
       }
     }
 
+    if (triangleCount === 0) {
+      throw new Error("ASCII STL contains 0 valid facet triangles.");
+    }
+
     const volumeMm3 = Math.abs(totalVolume);
     const volumeCm3 = volumeMm3 / 1000.0;
+
+    const dxMm = Math.max(0, maxX - minX);
+    const dyMm = Math.max(0, maxY - minY);
+    const dzMm = Math.max(0, maxZ - minZ);
+    const bboxVolumeCm3 = (dxMm * dyMm * dzMm) / 1000.0;
+
+    if (volumeMm3 <= 0 || !Number.isFinite(volumeMm3)) {
+      throw new Error("Calculated mesh volume is zero or non-finite. Ensure the 3D model is a closed, watertight manifold solid.");
+    }
 
     return {
       volumeMm3,
       volumeCm3,
       triangleCount,
       format: "ascii",
+      boundingBox: {
+        minX, maxX, minY, maxY, minZ, maxZ,
+        dxMm: Math.round(dxMm * 100) / 100,
+        dyMm: Math.round(dyMm * 100) / 100,
+        dzMm: Math.round(dzMm * 100) / 100,
+        bboxVolumeCm3: Math.round(bboxVolumeCm3 * 100) / 100,
+      },
     };
   }
 }
@@ -163,3 +263,4 @@ export function calculatePartWeight(volumeCm3: number, material: string): number
   const weight = volumeCm3 * density;
   return Math.round(weight * 100) / 100; // 2 decimal places precision
 }
+
