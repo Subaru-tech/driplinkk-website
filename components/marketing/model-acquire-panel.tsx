@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Download, Lock, LogIn, Sparkles } from "lucide-react";
+import { Check, Cpu, Download, Lock, LogIn, Printer, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -124,7 +124,7 @@ export function ModelAcquirePanel({
             </p>
           </>
         ) : acquired ? (
-          /* State 2: Free model, already acquired -> Direct Download & Library link */
+          /* State 2: Free model, already acquired -> Direct Download, LeaFF OS, Mart, Library */
           <>
             <Button
               id="direct-download-btn"
@@ -136,18 +136,41 @@ export function ModelAcquirePanel({
               <Download className="size-4" aria-hidden="true" />
               Download Model
             </Button>
+
+            <div className="grid grid-cols-2 gap-2">
+              <a
+                href={`leaffos://open?model=${modelId}`}
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-xs font-medium text-fg hover:border-accent hover:text-accent transition-colors"
+                title="Open geometry in LeaFF OS"
+              >
+                <Cpu className="size-3.5" aria-hidden="true" />
+                <span>Open in LeaFF</span>
+              </a>
+
+              <ButtonLink
+                href={`/mart?model_id=${modelId}`}
+                variant="secondary"
+                size="sm"
+                className="justify-center gap-1.5 text-xs font-medium"
+                title="Send geometry to DripLink Mart for fabrication"
+              >
+                <Printer className="size-3.5 text-accent" aria-hidden="true" />
+                <span>Send to Mart</span>
+              </ButtonLink>
+            </div>
+
             <ButtonLink
               href="/dashboard/library"
               id="in-library-btn"
               variant="secondary"
               size="sm"
-              className="w-full justify-center gap-1.5"
+              className="w-full justify-center gap-1.5 text-xs text-muted"
             >
-              <Check className="size-3.5" aria-hidden="true" />
-              In your library
+              <Check className="size-3.5 text-accent" aria-hidden="true" />
+              Saved in My Library
             </ButtonLink>
             <p className="text-center text-xs text-muted">
-              You own this model. Download the verified file directly or inspect it in LeaFF OS.
+              You own this model. Download verified geometry or manufacture directly.
             </p>
           </>
         ) : !signedIn ? (

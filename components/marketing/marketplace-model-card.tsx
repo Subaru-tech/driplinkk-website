@@ -1,18 +1,19 @@
 "use client";
 
-import { Box, Download, Heart, ShieldCheck, Star } from "lucide-react";
+import { Box, Heart, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { formatCurrency } from "@/lib/format";
-import { MODEL_LICENSES, getModelStats, type ModelLicenseType } from "@/lib/marketplace";
+import { MODEL_LICENSES, type ModelLicenseType } from "@/lib/marketplace";
 import type { MarketplaceModel } from "@/lib/types";
+import { toggleModelFavoriteAction } from "@/driplink-web-backend/actions/library";
 
 export function MarketplaceModelCard({ model }: { model: MarketplaceModel }) {
   const [favorited, setFavorited] = useState(false);
 
   const license = MODEL_LICENSES[model.license_type as ModelLicenseType] ?? {
     label: model.license_type,
-    badge: model.license_type,
+    badge: model.license_type || "Standard",
   };
 
   const previewImage =
@@ -21,8 +22,26 @@ export function MarketplaceModelCard({ model }: { model: MarketplaceModel }) {
       : null;
 
   const isFree = model.price === 0;
-  const stats = getModelStats(model.id);
   const sellerName = model.seller_name || model.seller?.full_name || "DripLink Creator";
+  const displayFormats =
+    model.formats && model.formats.length > 0
+      ? model.formats
+      : ["STL", "STEP", "3MF"];
+
+  async function handleToggleFavorite(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const next = !favorited;
+    setFavorited(next);
+    try {
+      const res = await toggleModelFavoriteAction(model.id);
+      if (res.success && typeof res.favorited === "boolean") {
+        setFavorited(res.favorited);
+      }
+    } catch {
+      setFavorited(!next);
+    }
+  }
 
   return (
     <div
@@ -56,13 +75,9 @@ export function MarketplaceModelCard({ model }: { model: MarketplaceModel }) {
         {/* Wishlist / Favorite Button */}
         <button
           type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setFavorited((prev) => !prev);
-          }}
+          onClick={handleToggleFavorite}
           aria-label={favorited ? "Remove from wishlist" : "Add to wishlist"}
-          className="absolute top-2.5 right-2.5 flex size-7 items-center justify-center rounded-full bg-canvas/80 text-muted backdrop-blur-sm border border-line/60 transition-colors hover:text-red-400 hover:bg-canvas"
+          className="absolute top-2.5 right-2.5 flex size-7 items-center justify-center rounded-full bg-canvas/80 text-muted backdrop-blur-sm border border-line/60 transition-colors hover:text-red-400 hover:bg-canvas cursor-pointer"
         >
           <Heart
             className={`size-3.5 transition-transform active:scale-125 ${
@@ -73,7 +88,7 @@ export function MarketplaceModelCard({ model }: { model: MarketplaceModel }) {
 
         {/* Formats Strip Tag */}
         <div className="absolute bottom-2 left-2 flex items-center gap-1">
-          {stats.formats.slice(0, 3).map((fmt) => (
+          {displayFormats.slice(0, 3).map((fmt) => (
             <span
               key={fmt}
               className="rounded bg-canvas/90 px-1.5 py-0.2 font-mono text-[9px] font-semibold text-muted backdrop-blur-sm border border-line/60"
@@ -102,17 +117,19 @@ export function MarketplaceModelCard({ model }: { model: MarketplaceModel }) {
             <span>by {sellerName}</span>
           </p>
 
-          {/* Social Proof: Rating & Downloads */}
-          <div className="flex items-center gap-3 text-xs text-muted pt-1">
-            <span className="flex items-center gap-1 font-semibold text-fg">
-              <Star className="size-3.5 fill-amber-400 text-amber-400" />
-              <span>{stats.rating}</span>
-            </span>
-            <span className="text-faint">·</span>
-            <span className="flex items-center gap-1 text-[11px] text-muted">
-              <Download className="size-3 text-faint" />
-              <span>{stats.downloads} downloads</span>
-            </span>
+          {/* Formats List */}
+          <div className="flex items-center gap-1.5 pt-1">
+            <span className="text-[11px] text-faint">CAD formats:</span>
+            <div className="flex items-center gap-1">
+              {displayFormats.map((fmt) => (
+                <span
+                  key={fmt}
+                  className="rounded bg-raised px-1.5 py-0.2 font-mono text-[9px] font-semibold text-fg/90 border border-line/80"
+                >
+                  {fmt}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -120,11 +137,11 @@ export function MarketplaceModelCard({ model }: { model: MarketplaceModel }) {
         <div className="mt-4 flex items-center justify-between border-t border-line/60 pt-3">
           <div className="flex flex-col">
             <span className="text-[10px] uppercase font-medium tracking-wider text-faint">
-              License Price
+              {isFree ? "License" : "Price"}
             </span>
             <span className="font-mono text-base font-bold text-fg">
               {isFree ? (
-                <span className="text-accent">Free</span>
+                <span className="text-accent font-semibold">Free</span>
               ) : (
                 formatCurrency(model.price)
               )}
@@ -133,7 +150,7 @@ export function MarketplaceModelCard({ model }: { model: MarketplaceModel }) {
 
           <Link
             href={`/models/${model.id}`}
-            className="inline-flex items-center justify-center rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-fg transition-all duration-150 hover:border-line-strong hover:bg-raised hover:text-accent group-hover:border-accent/40"
+            className="inline-flex items-center justify-center rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-fg transition-all duration-150 hover:border-accent hover:bg-raised hover:text-accent group-hover:border-accent/40"
           >
             View Model →
           </Link>

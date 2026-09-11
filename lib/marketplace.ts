@@ -39,19 +39,10 @@ export type ModelFormat = typeof MODEL_FORMATS[number];
 export const PRINT_MATERIALS = ["PLA", "PETG", "ABS", "TPU"] as const;
 export type PrintMaterial = typeof PRINT_MATERIALS[number];
 
-/** Deterministic community metrics helper for consistent marketplace display */
-export function getModelStats(modelId: string) {
-  let hash = 0;
-  for (let i = 0; i < modelId.length; i++) {
-    hash = (hash << 5) - hash + modelId.charCodeAt(i);
-    hash |= 0;
-  }
-  const absHash = Math.abs(hash);
-  const rating = (4.6 + (absHash % 4) * 0.1).toFixed(1);
-  const downloads = 80 + (absHash % 420);
+/** Model formats and metadata helpers */
+export function getModelStats() {
   const formats: ModelFormat[] = ["STL", "STEP", "3MF"];
-  if (absHash % 3 === 0) formats.push("OBJ");
-  return { rating, downloads, formats };
+  return { formats };
 }
 
 export function isCategory(value: string | undefined): value is Category {

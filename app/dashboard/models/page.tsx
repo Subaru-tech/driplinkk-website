@@ -32,13 +32,13 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-type StudioTab = "all" | "published" | "under_review" | "draft" | "rejected" | "acquired";
+type StudioTab = "all" | "draft" | "under_review" | "published" | "rejected" | "acquired";
 
 const TABS: { id: StudioTab; label: string }[] = [
   { id: "all", label: "All Models" },
-  { id: "published", label: "Published" },
-  { id: "under_review", label: "Under Review" },
   { id: "draft", label: "Drafts" },
+  { id: "under_review", label: "Under Review" },
+  { id: "published", label: "Published" },
   { id: "rejected", label: "Rejected" },
   { id: "acquired", label: "Acquired Library" },
 ];
@@ -140,9 +140,9 @@ async function CreatorStudioTable({ tab }: { tab: StudioTab }) {
             <tr>
               <th className="px-4 py-3">Model</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Updated</th>
               <th className="px-4 py-3">Price</th>
               <th className="px-4 py-3">Downloads</th>
-              <th className="px-4 py-3">Views</th>
               <th className="px-4 py-3">Earned</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
@@ -164,9 +164,7 @@ async function CreatorStudioTable({ tab }: { tab: StudioTab }) {
                     </div>
                     <div className="flex flex-col">
                       <span className="font-semibold text-fg line-clamp-1">{m.title}</span>
-                      <span className="text-[11px] text-muted">
-                        {m.category || "Mechanical"} · {formatDate(m.created_at)}
-                      </span>
+                      <span className="text-[11px] text-muted">{m.category || "Mechanical"}</span>
                     </div>
                   </div>
                 </td>
@@ -175,12 +173,15 @@ async function CreatorStudioTable({ tab }: { tab: StudioTab }) {
                   <StatusBadge status={m.status} />
                 </td>
 
+                <td className="px-4 py-3.5 font-mono text-muted text-[11px]">
+                  {formatDate(m.created_at)}
+                </td>
+
                 <td className="px-4 py-3.5 font-mono font-medium text-fg">
                   {m.price === 0 ? <span className="text-accent">Free</span> : formatCurrency(m.price)}
                 </td>
 
                 <td className="px-4 py-3.5 font-mono text-muted">{m.downloads}</td>
-                <td className="px-4 py-3.5 font-mono text-muted">{m.views}</td>
 
                 <td className="px-4 py-3.5 font-mono font-semibold text-fg">
                   {formatCurrency(m.earnings)}
@@ -191,17 +192,24 @@ async function CreatorStudioTable({ tab }: { tab: StudioTab }) {
                     <a
                       href={`leaffos://open?model=${m.id}`}
                       title="Open in LeaFF OS"
-                      className="rounded-lg p-1.5 text-muted hover:text-accent hover:bg-raised border border-line"
+                      className="rounded-lg p-1.5 text-muted hover:text-accent hover:bg-raised border border-line transition-colors"
                     >
                       <Cpu className="size-3.5" />
                     </a>
-                    {m.status === "published" && (
+                    {m.status === "published" ? (
                       <Link
                         href={`/models/${m.id}`}
                         className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-[11px] font-semibold text-fg hover:border-accent hover:text-accent transition-colors"
                       >
-                        <span>Marketplace</span>
+                        <span>View</span>
                         <ArrowUpRight className="size-3" />
+                      </Link>
+                    ) : (
+                      <Link
+                        href={`/dashboard/models/upload?id=${m.id}`}
+                        className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-[11px] font-semibold text-fg hover:border-accent hover:text-accent transition-colors"
+                      >
+                        <span>Edit</span>
                       </Link>
                     )}
                   </div>
@@ -229,7 +237,9 @@ async function CreatorStudioTable({ tab }: { tab: StudioTab }) {
               </div>
               <div className="flex flex-col flex-1 min-w-0">
                 <span className="font-semibold text-sm text-fg truncate">{m.title}</span>
-                <span className="text-xs text-muted">{m.category}</span>
+                <span className="text-xs text-muted">
+                  {m.category} · {formatDate(m.created_at)}
+                </span>
                 <div className="pt-1">
                   <StatusBadge status={m.status} />
                 </div>
@@ -261,9 +271,13 @@ async function CreatorStudioTable({ tab }: { tab: StudioTab }) {
                 <Cpu className="size-3.5" />
                 <span>LeaFF OS</span>
               </a>
-              {m.status === "published" && (
+              {m.status === "published" ? (
                 <Link href={`/models/${m.id}`} className="text-xs font-semibold text-accent hover:underline">
                   View in Marketplace →
+                </Link>
+              ) : (
+                <Link href={`/dashboard/models/upload?id=${m.id}`} className="text-xs font-semibold text-accent hover:underline">
+                  Edit Model →
                 </Link>
               )}
             </div>

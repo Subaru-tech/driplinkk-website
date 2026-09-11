@@ -175,15 +175,23 @@ export async function getCreatorStudioModels(
   const { data, error } = await query;
   if (error || !data) return empty([]);
 
-  const models: CreatorStudioModel[] = data.map((row) => {
-    let hash = 0;
-    for (let i = 0; i < row.id.length; i++) {
-      hash = (hash << 5) - hash + row.id.charCodeAt(i);
-      hash |= 0;
+  const modelIds = data.map((row) => row.id);
+  const acquisitionCounts: Record<string, number> = {};
+  if (modelIds.length > 0) {
+    const { data: acqs } = await serviceSupabase
+      .from("model_acquisitions")
+      .select("model_id")
+      .in("model_id", modelIds);
+    if (acqs) {
+      for (const a of acqs) {
+        acquisitionCounts[a.model_id] = (acquisitionCounts[a.model_id] || 0) + 1;
+      }
     }
-    const absHash = Math.abs(hash);
-    const downloads = row.status === "published" ? 25 + (absHash % 320) : 0;
-    const views = row.status === "published" ? downloads * 4 + (absHash % 150) : 0;
+  }
+
+  const models: CreatorStudioModel[] = data.map((row) => {
+    const downloads = acquisitionCounts[row.id] || 0;
+    const views = 0;
     const price = Number(row.price || 0);
     const earnings = downloads * price;
 

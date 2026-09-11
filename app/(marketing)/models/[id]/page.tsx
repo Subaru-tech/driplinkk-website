@@ -23,7 +23,6 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { formatDate } from "@/lib/format";
 import {
   MODEL_LICENSES,
-  getModelStats,
   type ModelLicenseType,
 } from "@/lib/marketplace";
 import {
@@ -33,6 +32,8 @@ import {
   getUnifiedUser,
   isModelAcquired,
 } from "@/driplink-web-backend";
+
+import { ModelFavoriteButton } from "@/components/marketing/model-favorite-button";
 
 export const dynamic = "force-dynamic";
 
@@ -97,7 +98,6 @@ export default async function ModelDetailPage({
   };
 
   const isFree = model.price === 0;
-  const stats = getModelStats(model.id);
   const sellerName = model.seller_name || model.seller?.full_name || "DripLink Creator";
   const previewImages = model.preview_image_paths || [];
 
@@ -107,12 +107,12 @@ export default async function ModelDetailPage({
   return (
     <Section>
       <div className="flex flex-col gap-10">
-        {/* Navigation Breadcrumb */}
-        <div className="flex items-center justify-between">
-          <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-muted">
+        {/* Navigation Breadcrumb & Favorite Button */}
+        <div className="flex items-center justify-between gap-4">
+          <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-muted min-w-0">
             <Link
               href="/models"
-              className="inline-flex items-center gap-1 hover:text-fg transition-colors"
+              className="inline-flex items-center gap-1 hover:text-fg transition-colors shrink-0"
             >
               <ArrowLeft className="size-3.5" />
               <span>Back to Models</span>
@@ -122,15 +122,17 @@ export default async function ModelDetailPage({
               <>
                 <Link
                   href={`/models?category=${encodeURIComponent(model.category)}`}
-                  className="hover:text-fg transition-colors"
+                  className="hover:text-fg transition-colors shrink-0"
                 >
                   {model.category}
                 </Link>
                 <span>/</span>
               </>
             ) : null}
-            <span className="text-fg font-medium truncate max-w-xs">{model.title}</span>
+            <span className="text-fg font-medium truncate">{model.title}</span>
           </nav>
+
+          <ModelFavoriteButton modelId={model.id} />
         </div>
 
         {/* Primary Stage: 3D Viewer on Left, Model Info & Ecosystem Buy Box on Right */}
@@ -165,30 +167,24 @@ export default async function ModelDetailPage({
                   <span>by {sellerName}</span>
                 </span>
                 <span>·</span>
-                <span className="flex items-center gap-1 font-semibold text-fg">
-                  <Star className="size-3.5 fill-amber-400 text-amber-400" />
-                  <span>{stats.rating}</span>
-                </span>
-                <span>·</span>
-                <span className="flex items-center gap-1">
-                  <Download className="size-3.5 text-faint" />
-                  <span>{stats.downloads} downloads</span>
-                </span>
-                <span>·</span>
                 <span className="flex items-center gap-1">
                   <Calendar className="size-3.5 text-faint" />
-                  <span>{formatDate(model.created_at)}</span>
+                  <span>Added {formatDate(model.created_at)}</span>
+                </span>
+                <span>·</span>
+                <span className="inline-flex items-center gap-1 rounded bg-raised px-2 py-0.5 font-mono text-[11px] text-fg border border-line">
+                  Verified CAD Kit ✓
                 </span>
               </div>
 
               {/* Supported CAD Formats */}
               <div className="flex items-center gap-2 pt-1">
-                <span className="text-xs text-muted">Formats:</span>
-                <div className="flex items-center gap-1.5">
-                  {stats.formats.map((fmt) => (
+                <span className="text-xs text-muted">CAD Formats:</span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(model.formats && model.formats.length > 0 ? model.formats : ["STL", "STEP", "3MF"]).map((fmt) => (
                     <span
                       key={fmt}
-                      className="rounded bg-surface px-2 py-0.5 font-mono text-[11px] font-semibold text-fg border border-line"
+                      className="rounded bg-surface px-2.5 py-0.5 font-mono text-[11px] font-semibold text-fg border border-line"
                     >
                       {fmt} ✓
                     </span>
