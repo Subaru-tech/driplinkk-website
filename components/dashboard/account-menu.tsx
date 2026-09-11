@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, ShieldCheck, Store, UserCog } from "lucide-react";
+import { LogOut, ShieldCheck, Store, UserCog, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -142,6 +142,16 @@ export function AccountMenu({
           >
             <Store className="size-4" aria-hidden="true" />
             {isSeller ? "Seller studio" : "Start selling"}
+          </Link>
+
+          <Link
+            href="/dashboard/freelancer"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 px-4 py-2.5 text-sm text-muted transition-colors hover:bg-raised hover:text-fg"
+          >
+            <Wrench className="size-4" aria-hidden="true" />
+            Specialist studio
           </Link>
 
           {isAdmin ? (

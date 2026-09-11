@@ -174,3 +174,60 @@ export type AcquiredModel = {
   seller_name: string;
 };
 
+/* ----------------------------------------------------------- Freelance side */
+
+export type ProviderType = "vendor" | "seller" | "freelancer";
+export type ProviderStatus = "pending" | "approved" | "rejected";
+
+export type Provider = {
+  id: string;
+  user_id: string;
+  type: ProviderType;
+  status: ProviderStatus;
+  created_at: string;
+};
+
+export type RateType = "hourly" | "fixed";
+
+export type FreelancerProfile = {
+  provider_id: string;
+  user_id?: string;
+  display_name: string;
+  bio: string | null;
+  skills: string[];
+  portfolio_urls: string[];
+  rate_type: RateType;
+  base_rate: number;
+  avatar_url?: string | null;
+  updated_at?: string;
+};
+
+export type FreelanceRequestStatus =
+  | "requested"
+  | "accepted"
+  | "in_progress"
+  | "delivered"
+  | "completed"
+  | "cancelled";
+
+export type FreelanceRequest = {
+  id: string;
+  buyer_user_id: string;
+  freelancer_provider_id: string;
+  freelancer_user_id?: string;
+  brief: string;
+  reference_file_paths: string[];
+  agreed_price: number | null;
+  status: FreelanceRequestStatus;
+  final_file_path: string | null;
+  created_at: string;
+  updated_at: string;
+  buyer_name?: string;
+  buyer_avatar?: string | null;
+  buyer_email?: string | null;
+  freelancer_name?: string;
+  freelancer_avatar?: string | null;
+  freelancer_email?: string | null;
+};
+
+

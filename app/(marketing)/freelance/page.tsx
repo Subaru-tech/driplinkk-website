@@ -62,7 +62,13 @@ const steps = [
   },
 ];
 
-export default function FreelancePage() {
+import { getFreelanceBrowseProfiles } from "@/driplink-web-backend/db/queries";
+
+export const dynamic = "force-dynamic";
+
+export default async function FreelancePage() {
+  const { data: browseResult } = await getFreelanceBrowseProfiles({ page: 1, pageSize: 24 });
+
   return (
     <>
       <Hero
@@ -78,8 +84,8 @@ export default function FreelancePage() {
             <ButtonLink href="#browse" size="lg">
               Browse Specialists
             </ButtonLink>
-            <ButtonLink href="/signup?role=creator" variant="secondary" size="lg">
-              Post a Part Request
+            <ButtonLink href="/freelance/apply" variant="secondary" size="lg">
+              Apply as Specialist
             </ButtonLink>
           </>
         }
@@ -93,7 +99,13 @@ export default function FreelancePage() {
           description="Filter by discipline, CAD tool, or specific manufacturing need. Review past print-ready projects and request transparent milestone quotes."
         />
         <div className="mt-10">
-          <FreelanceBrowser />
+          <FreelanceBrowser
+            initialProfiles={browseResult.profiles}
+            initialTotal={browseResult.total}
+            initialPage={browseResult.page}
+            initialPageSize={browseResult.pageSize}
+            initialTotalPages={browseResult.totalPages}
+          />
         </div>
       </Section>
 
@@ -148,7 +160,7 @@ export default function FreelancePage() {
               Join DripLink&apos;s vetted specialist network. Get matched with buyers seeking custom
               functional parts, electronics enclosures, and print-ready models.
             </p>
-            <ButtonLink href="/signup?role=seller" variant="secondary" size="md" className="mt-2">
+            <ButtonLink href="/freelance/apply" variant="secondary" size="lg" className="mt-2 min-h-[44px]">
               Apply to join as a Freelancer
             </ButtonLink>
           </div>
@@ -162,3 +174,4 @@ export default function FreelancePage() {
     </>
   );
 }
+

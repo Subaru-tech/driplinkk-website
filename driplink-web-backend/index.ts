@@ -12,3 +12,4 @@ export * from "./actions/account";
 export * from "./actions/admin";
 export * from "./actions/library";
 export * from "./actions/upload";
+export * from "./actions/freelance";

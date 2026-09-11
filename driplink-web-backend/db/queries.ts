@@ -5,6 +5,8 @@ import { getUnifiedUser, isClerkConfigured, syncClerkProfile } from "@/driplink-
 import { LISTING_SORTS, type Category, type ListingSort } from "@/lib/marketplace";
 import type {
   AcquiredModel,
+  FreelanceRequest,
+  FreelancerProfile,
   LedgerEntry,
   LibraryItem,
   Listing,
@@ -15,9 +17,11 @@ import type {
   Model,
   Payout,
   Profile,
+  Provider,
   Sale,
   SellerProfile,
 } from "@/lib/types";
+
 
 /**
  * Dashboard data access.
@@ -938,3 +942,357 @@ export async function getMarketplaceCategoryCounts(): Promise<
   }
   return { data: counts, backendReady: true };
 }
+
+/* ----------------------------------------------------------- Freelance queries */
+
+export type FreelanceBrowseResult = {
+  profiles: FreelancerProfile[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+export async function getFreelanceBrowseProfiles(options: {
+  search?: string;
+  skill?: string;
+  rateType?: string;
+  page?: number;
+  pageSize?: number;
+} = {}): Promise<QueryResult<FreelanceBrowseResult>> {
+  const supabase = await getSupabaseServerClient();
+  const page = Math.max(options.page ?? 1, 1);
+  const pageSize = options.pageSize ?? 12;
+
+  const fallback: FreelanceBrowseResult = {
+    profiles: [],
+    total: 0,
+    page,
+    pageSize,
+    totalPages: 0,
+  };
+
+  if (!supabase) return empty(fallback);
+
+  try {
+    const { data: rpcRows, error: rpcErr } = await supabase.rpc("get_freelance_browse_profiles", {
+      p_search: options.search?.trim() || null,
+      p_skill: options.skill?.trim() || null,
+      p_rate_type: options.rateType && options.rateType !== "all" ? options.rateType : null,
+      p_page: page,
+      p_page_size: pageSize,
+    });
+
+    if (!rpcErr && rpcRows) {
+      const total = Number(rpcRows[0]?.total_count ?? 0);
+      const profiles: FreelancerProfile[] = rpcRows.map((r: {
+        provider_id: string;
+        user_id: string;
+        display_name: string;
+        bio: string | null;
+        skills: string[] | null;
+        portfolio_urls: string[] | null;
+        rate_type: "hourly" | "fixed";
+        base_rate: number | string;
+        avatar_url: string | null;
+      }) => ({
+        provider_id: r.provider_id,
+        user_id: r.user_id,
+        display_name: r.display_name,
+        bio: r.bio,
+        skills: r.skills ?? [],
+        portfolio_urls: r.portfolio_urls ?? [],
+        rate_type: r.rate_type,
+        base_rate: Number(r.base_rate),
+        avatar_url: r.avatar_url,
+      }));
+
+      return {
+        data: {
+          profiles,
+          total,
+          page,
+          pageSize,
+          totalPages: Math.ceil(total / pageSize),
+        },
+        backendReady: true,
+      };
+    }
+
+    // Direct query fallback
+    let query = supabase
+      .from("freelancer_profiles")
+      .select("provider_id, display_name, bio, skills, portfolio_urls, rate_type, base_rate, updated_at, provider:providers!inner(id, user_id, status, profile:profiles(avatar_url))", { count: "exact" })
+      .eq("provider.status", "approved");
+
+    if (options.rateType && options.rateType !== "all") {
+      query = query.eq("rate_type", options.rateType);
+    }
+    if (options.search) {
+      const escaped = options.search.replace(/[%_]/g, (c) => `\\${c}`);
+      query = query.or(`display_name.ilike.%${escaped}%,bio.ilike.%${escaped}%`);
+    }
+
+    const from = (page - 1) * pageSize;
+    query = query.range(from, from + pageSize - 1);
+
+    const { data, count, error } = await query;
+    if (error || !data) {
+      return empty(fallback);
+    }
+
+    const total = count ?? 0;
+    const profiles: FreelancerProfile[] = (data as unknown as Array<Record<string, unknown>>).map((row) => {
+      const prov = row.provider as { id: string; user_id: string; status: string; profile?: { avatar_url: string | null } } | null;
+      return {
+        provider_id: String(row.provider_id),
+        user_id: prov?.user_id,
+        display_name: String(row.display_name),
+        bio: (row.bio as string) ?? null,
+        skills: (row.skills as string[]) ?? [],
+        portfolio_urls: (row.portfolio_urls as string[]) ?? [],
+        rate_type: (row.rate_type as "hourly" | "fixed") ?? "hourly",
+        base_rate: Number(row.base_rate || 0),
+        avatar_url: prov?.profile?.avatar_url ?? null,
+        updated_at: (row.updated_at as string) ?? undefined,
+      };
+    });
+
+    return {
+      data: {
+        profiles,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+      },
+      backendReady: true,
+    };
+  } catch (err) {
+    console.error("getFreelanceBrowseProfiles error:", err);
+    return empty(fallback);
+  }
+}
+
+export async function getFreelancerProfileById(
+  providerId: string
+): Promise<QueryResult<FreelancerProfile | null>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty(null);
+
+  try {
+    const { data: rpcRows, error: rpcErr } = await supabase.rpc(
+      "get_freelancer_profile_by_id",
+      { p_provider_id: providerId }
+    );
+
+    if (!rpcErr && rpcRows && rpcRows.length > 0) {
+      const row = rpcRows[0];
+      const profile: FreelancerProfile = {
+        provider_id: row.provider_id,
+        user_id: row.user_id,
+        display_name: row.display_name,
+        bio: row.bio,
+        skills: row.skills ?? [],
+        portfolio_urls: row.portfolio_urls ?? [],
+        rate_type: row.rate_type,
+        base_rate: Number(row.base_rate || 0),
+        avatar_url: row.avatar_url,
+        updated_at: row.updated_at,
+      };
+      return { data: profile, backendReady: true };
+    }
+
+    const { data, error } = await supabase
+      .from("freelancer_profiles")
+      .select("provider_id, display_name, bio, skills, portfolio_urls, rate_type, base_rate, updated_at, provider:providers!inner(id, user_id, status)")
+      .eq("provider_id", providerId)
+      .eq("provider.status", "approved")
+      .maybeSingle();
+
+    if (error || !data) return empty(null);
+
+    const row = data as unknown as {
+      provider_id: string;
+      display_name: string;
+      bio: string | null;
+      skills: string[] | null;
+      portfolio_urls: string[] | null;
+      rate_type: "hourly" | "fixed";
+      base_rate: number | string;
+      updated_at: string;
+      provider?: { user_id: string };
+    };
+
+    const profile: FreelancerProfile = {
+      provider_id: row.provider_id,
+      user_id: row.provider?.user_id,
+      display_name: row.display_name,
+      bio: row.bio,
+      skills: row.skills ?? [],
+      portfolio_urls: row.portfolio_urls ?? [],
+      rate_type: row.rate_type,
+      base_rate: Number(row.base_rate || 0),
+      avatar_url: null,
+      updated_at: row.updated_at,
+    };
+
+    return { data: profile, backendReady: true };
+  } catch (err) {
+    console.error("getFreelancerProfileById error:", err);
+    return empty(null);
+  }
+}
+
+export async function getMyFreelanceProvider(): Promise<QueryResult<Provider | null>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty(null);
+
+  const user = await getUnifiedUser();
+  if (!user) return empty(null);
+
+  try {
+    const { data, error } = await supabase
+      .from("providers")
+      .select("id, user_id, type, status, created_at")
+      .eq("user_id", user.id)
+      .eq("type", "freelancer")
+      .maybeSingle();
+
+    if (error || !data) return empty(null);
+    return { data: data as Provider, backendReady: true };
+  } catch (err) {
+    console.error("getMyFreelanceProvider error:", err);
+    return empty(null);
+  }
+}
+
+export async function getBuyerFreelanceRequests(): Promise<QueryResult<FreelanceRequest[]>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty([]);
+
+  const user = await getUnifiedUser();
+  if (!user) return empty([]);
+
+  try {
+    const { data: rpcRows, error: rpcErr } = await supabase.rpc("get_freelance_requests_for_user", {
+      p_user_id: user.id,
+      p_role: "buyer",
+    });
+
+    if (!rpcErr && rpcRows) {
+      const requests: FreelanceRequest[] = rpcRows.map((r: {
+        request_id: string;
+        buyer_user_id: string;
+        freelancer_provider_id: string;
+        freelancer_user_id: string;
+        brief: string;
+        reference_file_paths: string[] | null;
+        agreed_price: number | string | null;
+        status: FreelanceRequest["status"];
+        final_file_path: string | null;
+        created_at: string;
+        updated_at: string;
+        buyer_name: string | null;
+        buyer_avatar: string | null;
+        buyer_email: string | null;
+        freelancer_name: string | null;
+        freelancer_avatar: string | null;
+        freelancer_email: string | null;
+      }) => ({
+        id: r.request_id,
+        buyer_user_id: r.buyer_user_id,
+        freelancer_provider_id: r.freelancer_provider_id,
+        freelancer_user_id: r.freelancer_user_id,
+        brief: r.brief,
+        reference_file_paths: r.reference_file_paths ?? [],
+        agreed_price: r.agreed_price !== null ? Number(r.agreed_price) : null,
+        status: r.status,
+        final_file_path: r.final_file_path,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+        buyer_name: r.buyer_name ?? "Buyer",
+        buyer_avatar: r.buyer_avatar,
+        buyer_email: r.buyer_email,
+        freelancer_name: r.freelancer_name ?? "Freelancer",
+        freelancer_avatar: r.freelancer_avatar,
+        freelancer_email: r.freelancer_email,
+      }));
+      return { data: requests, backendReady: true };
+    }
+
+    const { data, error } = await supabase
+      .from("freelance_requests")
+      .select("id, buyer_user_id, freelancer_provider_id, brief, reference_file_paths, agreed_price, status, final_file_path, created_at, updated_at")
+      .eq("buyer_user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error || !data) return empty([]);
+    return { data: (data as unknown as FreelanceRequest[]), backendReady: true };
+  } catch (err) {
+    console.error("getBuyerFreelanceRequests error:", err);
+    return empty([]);
+  }
+}
+
+export async function getFreelancerIncomingRequests(): Promise<QueryResult<FreelanceRequest[]>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty([]);
+
+  const user = await getUnifiedUser();
+  if (!user) return empty([]);
+
+  try {
+    const { data: rpcRows, error: rpcErr } = await supabase.rpc("get_freelance_requests_for_user", {
+      p_user_id: user.id,
+      p_role: "freelancer",
+    });
+
+    if (!rpcErr && rpcRows) {
+      const requests: FreelanceRequest[] = rpcRows.map((r: {
+        request_id: string;
+        buyer_user_id: string;
+        freelancer_provider_id: string;
+        freelancer_user_id: string;
+        brief: string;
+        reference_file_paths: string[] | null;
+        agreed_price: number | string | null;
+        status: FreelanceRequest["status"];
+        final_file_path: string | null;
+        created_at: string;
+        updated_at: string;
+        buyer_name: string | null;
+        buyer_avatar: string | null;
+        buyer_email: string | null;
+        freelancer_name: string | null;
+        freelancer_avatar: string | null;
+        freelancer_email: string | null;
+      }) => ({
+        id: r.request_id,
+        buyer_user_id: r.buyer_user_id,
+        freelancer_provider_id: r.freelancer_provider_id,
+        freelancer_user_id: r.freelancer_user_id,
+        brief: r.brief,
+        reference_file_paths: r.reference_file_paths ?? [],
+        agreed_price: r.agreed_price !== null ? Number(r.agreed_price) : null,
+        status: r.status,
+        final_file_path: r.final_file_path,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+        buyer_name: r.buyer_name ?? "Buyer",
+        buyer_avatar: r.buyer_avatar,
+        buyer_email: r.buyer_email,
+        freelancer_name: r.freelancer_name ?? "Freelancer",
+        freelancer_avatar: r.freelancer_avatar,
+        freelancer_email: r.freelancer_email,
+      }));
+      return { data: requests, backendReady: true };
+    }
+
+    return empty([]);
+  } catch (err) {
+    console.error("getFreelancerIncomingRequests error:", err);
+    return empty([]);
+  }
+}
+
