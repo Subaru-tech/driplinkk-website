@@ -58,17 +58,21 @@ function ClerkGoogleButton({
     setSubmitting(true);
     const isSignUp = text.toLowerCase().includes("sign up");
 
+    const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const redirectParam = searchParams?.get("redirect");
+    const redirectUrl = redirectParam && redirectParam.startsWith("/") ? redirectParam : "/dashboard";
+
     try {
-      if (isSignUp) {
+      if (isSignUp && signUp) {
         const { error } = await signUp.sso({
           strategy: "oauth_google",
-          redirectUrl: "/dashboard",
+          redirectUrl,
           redirectCallbackUrl: "/sso-callback",
         });
         if (error) {
           const { error: signInErr } = await signIn.sso({
             strategy: "oauth_google",
-            redirectUrl: "/dashboard",
+            redirectUrl,
             redirectCallbackUrl: "/sso-callback",
           });
           if (signInErr) {
@@ -76,16 +80,16 @@ function ClerkGoogleButton({
             onError(signInErr.message || error.message || "Failed to authenticate with Google.");
           }
         }
-      } else {
+      } else if (signIn) {
         const { error } = await signIn.sso({
           strategy: "oauth_google",
-          redirectUrl: "/dashboard",
+          redirectUrl,
           redirectCallbackUrl: "/sso-callback",
         });
         if (error) {
           const { error: signUpErr } = await signUp.sso({
             strategy: "oauth_google",
-            redirectUrl: "/dashboard",
+            redirectUrl,
             redirectCallbackUrl: "/sso-callback",
           });
           if (signUpErr) {

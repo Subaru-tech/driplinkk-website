@@ -21,8 +21,8 @@ export default function SSOCallbackPage() {
     <div className="flex min-h-screen items-center justify-center bg-canvas">
       <AuthenticateWithRedirectCallback
         continueSignUpUrl="/dashboard"
-        signUpForceRedirectUrl="/dashboard"
-        signInForceRedirectUrl="/dashboard"
+        signUpFallbackRedirectUrl="/dashboard"
+        signInFallbackRedirectUrl="/dashboard"
       />
       <div id="clerk-captcha" className="empty:hidden" />
     </div>
