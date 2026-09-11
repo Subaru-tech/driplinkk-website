@@ -34,7 +34,6 @@ export function HireModal({
 
   const [brief, setBrief] = useState("");
   const [referenceFiles, setReferenceFiles] = useState<File[]>([]);
-  const [uploadedPaths, setUploadedPaths] = useState<string[]>([]);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -64,7 +63,7 @@ export function HireModal({
 
     startTransition(async () => {
       try {
-        let finalFilePaths: string[] = [];
+        const finalFilePaths: string[] = [];
 
         // Upload reference files if any
         if (referenceFiles.length > 0) {

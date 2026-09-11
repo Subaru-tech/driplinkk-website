@@ -4,18 +4,25 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { StatusPill } from "@/components/ui/status-pill";
 import { formatDateTime } from "@/lib/format";
 import type { SessionRecord } from "@/lib/types";
+import { RevokeSessionButton } from "@/components/dashboard/revoke-session-button";
 
 /**
- * Spec §6.5 — active sessions, including the desktop app's ("LeaFF OS
- * Desktop"), each revocable except the current one.
+ * Spec §6.5 — active sessions, each revocable except the current one.
  *
- * NOTE FOR TRACK 2: supabase-js has no client-side "list my sessions" call —
- * `auth.admin.listUsers` / session inspection needs the service-role key, so
- * this list has to come from a server route (or a `user_sessions` table the
- * backend maintains). Until that endpoint exists this renders its real empty
- * state rather than a plausible-looking invented device list.
+ * Data sources per auth provider:
+ *  - Clerk: real sessions, read server-side via the Backend API and passed in
+ *    by the account page; "Revoke" calls the Clerk SDK client-side.
+ *  - Supabase: supabase-js has no "list my sessions" call and the admin API
+ *    needs the service role, so this renders its real empty state rather than
+ *    an invented device list.
  */
-export function SessionsSection({ sessions }: { sessions: SessionRecord[] }) {
+export function SessionsSection({
+  sessions,
+  provider,
+}: {
+  sessions: SessionRecord[];
+  provider: "clerk" | "supabase";
+}) {
   return (
     <Card as="section" className="flex flex-col gap-6">
       <CardTitle>Active sessions</CardTitle>
@@ -24,7 +31,11 @@ export function SessionsSection({ sessions }: { sessions: SessionRecord[] }) {
         <EmptyState
           icon={MonitorSmartphone}
           size="sm"
-          message="No session data available yet."
+          message={
+            provider === "clerk"
+              ? "No other active sessions."
+              : "Session listing isn't available for this account type yet."
+          }
         />
       ) : (
         <ul className="flex flex-col divide-y divide-[var(--border)]">
@@ -43,12 +54,7 @@ export function SessionsSection({ sessions }: { sessions: SessionRecord[] }) {
               </div>
 
               {session.is_current ? null : (
-                <button
-                  type="button"
-                  className="shrink-0 text-sm font-medium text-danger transition-opacity hover:opacity-80"
-                >
-                  Revoke
-                </button>
+                <RevokeSessionButton sessionId={session.id} />
               )}
             </li>
           ))}

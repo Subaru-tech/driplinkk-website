@@ -26,6 +26,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { DownloadButton } from "@/lib/downloads";
 import { Card } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status-pill";
 import { cn } from "@/lib/cn";
@@ -131,20 +132,26 @@ export function DownloadHub() {
   const [selectedWinFormat, setSelectedWinFormat] = useState<"installer" | "portable">("installer");
   const [selectedLinuxFormat, setSelectedLinuxFormat] = useState<"appimage" | "deb">("appimage");
 
+  /* Detect the OS lazily — after hydration and a paint — rather than in an
+     effect. Reading the user agent here can only ever produce a highlight, so
+     deferring it avoids a hydration-time re-render entirely. */
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const ua = window.navigator.userAgent.toLowerCase();
-    if (ua.includes("iphone") || ua.includes("ipad") || ua.includes("ipod")) {
-      setDetectedOS("iOS");
-    } else if (ua.includes("android")) {
-      setDetectedOS("Android");
-    } else if (ua.includes("mac")) {
-      setDetectedOS("macOS");
-    } else if (ua.includes("win")) {
-      setDetectedOS("Windows");
-    } else if (ua.includes("linux")) {
-      setDetectedOS("Linux");
-    }
+    const raf = requestAnimationFrame(() => {
+      const ua = window.navigator.userAgent.toLowerCase();
+      if (ua.includes("iphone") || ua.includes("ipad") || ua.includes("ipod")) {
+        setDetectedOS("iOS");
+      } else if (ua.includes("android")) {
+        setDetectedOS("Android");
+      } else if (ua.includes("mac")) {
+        setDetectedOS("macOS");
+      } else if (ua.includes("win")) {
+        setDetectedOS("Windows");
+      } else if (ua.includes("linux")) {
+        setDetectedOS("Linux");
+      }
+    });
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   const handleCopy = (text: string, key: string) => {
@@ -540,18 +547,14 @@ export function DownloadHub() {
               </div>
 
               <div className="mt-6 flex flex-col gap-2">
-                <ButtonLink
-                  href={
+                <DownloadButton
+                  filename={
                     selectedMacArch === "arm64"
-                      ? "/downloads/LeaFF-OS-0.9.4-arm64.dmg"
-                      : "/downloads/LeaFF-OS-0.9.4-x86_64.dmg"
+                      ? "LeaFF-OS-0.9.4-arm64.dmg"
+                      : "LeaFF-OS-0.9.4-x86_64.dmg"
                   }
-                  size="md"
-                  className="w-full"
-                >
-                  <Download className="size-4" />
-                  Download for Mac ({selectedMacArch === "arm64" ? "Apple Silicon" : "Intel"})
-                </ButtonLink>
+                  label={`Download for Mac (${selectedMacArch === "arm64" ? "Apple Silicon" : "Intel"})`}
+                />
                 <p className="text-center font-mono text-[11px] text-faint">
                   SHA-256 verified • Automatic in-app updates
                 </p>
@@ -662,18 +665,14 @@ export function DownloadHub() {
               </div>
 
               <div className="mt-6 flex flex-col gap-2">
-                <ButtonLink
-                  href={
+                <DownloadButton
+                  filename={
                     selectedWinFormat === "installer"
-                      ? "/downloads/LeaFF-OS-Setup-0.9.4-x64.exe"
-                      : "/downloads/LeaFF-OS-Portable-0.9.4-x64.zip"
+                      ? "LeaFF-OS-Setup-0.9.4-x64.exe"
+                      : "LeaFF-OS-Portable-0.9.4-x64.zip"
                   }
-                  size="md"
-                  className="w-full"
-                >
-                  <Download className="size-4" />
-                  Download for Windows ({selectedWinFormat === "installer" ? "Installer" : "Portable"})
-                </ButtonLink>
+                  label={`Download for Windows (${selectedWinFormat === "installer" ? "Installer" : "Portable"})`}
+                />
                 <p className="text-center font-mono text-[11px] text-faint">
                   DirectX 12 & Vulkan GPU acceleration
                 </p>
@@ -785,18 +784,14 @@ export function DownloadHub() {
               </div>
 
               <div className="mt-6 flex flex-col gap-2">
-                <ButtonLink
-                  href={
+                <DownloadButton
+                  filename={
                     selectedLinuxFormat === "appimage"
-                      ? "/downloads/LeaFF-OS-0.9.4.AppImage"
-                      : "/downloads/leaff-os_0.9.4_amd64.deb"
+                      ? "LeaFF-OS-0.9.4.AppImage"
+                      : "leaff-os_0.9.4_amd64.deb"
                   }
-                  size="md"
-                  className="w-full"
-                >
-                  <Download className="size-4" />
-                  Download for Linux ({selectedLinuxFormat === "appimage" ? "AppImage" : ".deb"})
-                </ButtonLink>
+                  label={`Download for Linux (${selectedLinuxFormat === "appimage" ? "AppImage" : ".deb"})`}
+                />
                 <p className="text-center font-mono text-[11px] text-faint">
                   Works on Ubuntu, Fedora, Arch, Debian & Mint
                 </p>
@@ -924,16 +919,7 @@ export function DownloadHub() {
               </div>
 
               <div className="mt-6 flex flex-col gap-2">
-                <ButtonLink
-                  href="https://testflight.apple.com/join/driplink"
-                  size="md"
-                  className="w-full"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Apple className="size-4" />
-                  Install via Apple TestFlight
-                </ButtonLink>
+                <DownloadButton label="Install via Apple TestFlight" filename="ios-testflight" href="https://testflight.apple.com/join/driplink" />
                 <ButtonLink
                   href="/signup"
                   size="md"
@@ -1000,15 +986,11 @@ export function DownloadHub() {
                   <AndroidIcon className="size-4" />
                   Get it on Google Play
                 </ButtonLink>
-                <ButtonLink
-                  href="/downloads/DripLink-Companion-1.2.0.apk"
-                  size="md"
+                <DownloadButton
+                  filename="DripLink-Companion-1.2.0.apk"
+                  label="Direct APK (34.2 MB)"
                   variant="secondary"
-                  className="w-full"
-                >
-                  <Download className="size-4" />
-                  Direct APK (34.2 MB)
-                </ButtonLink>
+                />
               </div>
             </Card>
 

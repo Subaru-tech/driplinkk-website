@@ -1,9 +1,15 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeScript } from "@/components/theme-script";
 import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+};
 
 /* Spec §1.2 — Space Grotesk for headings, Inter for body,
    JetBrains Mono for credit numbers, order IDs, filenames and timestamps. */
@@ -27,11 +33,11 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "DripLink — design it, refine it, print it",
+    default: "DripLink — One-stop platform for turning ideas into products",
     template: "%s · DripLink",
   },
   description:
-    "DripLink builds LeaFF OS, Mart and the DripLink app — one pipeline from idea to printed part, without bouncing between two tools.",
+    "DripLink — design, build, source, and manufacture — without the friction.",
 };
 
 const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseServerClient, getSupabaseServiceClient } from "@/driplink-web-backend/db/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getUnifiedUser, isClerkConfigured, syncClerkProfile } from "@/driplink-web-backend/auth/clerk";
 import { LISTING_SORTS, type Category, type ListingSort } from "@/lib/marketplace";
 import type {
@@ -44,6 +45,17 @@ export type QueryResult<T> = {
  */
 function empty<T>(fallback: T): QueryResult<T> {
   return { data: fallback, backendReady: false };
+}
+
+/**
+ * Client for owner-scoped reads. Supabase-auth users pass RLS through the
+ * cookie-bound client, but Clerk-authenticated users hold no Supabase JWT, so
+ * every RLS-filtered read returns empty for them. The service-role client
+ * bypasses RLS — safe here because each caller resolves the user id
+ * server-side via getUnifiedUser() before filtering on it.
+ */
+async function getOwnerQueryClient(): Promise<SupabaseClient | null> {
+  return getSupabaseServiceClient() ?? (await getSupabaseServerClient());
 }
 
 export async function getProfile(): Promise<QueryResult<Profile | null>> {
@@ -94,7 +106,7 @@ export async function getModels(
   limit?: number,
   options: { search?: string; sort?: ModelSort } = {},
 ): Promise<QueryResult<Model[]>> {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getOwnerQueryClient();
   if (!supabase) return empty([]);
 
   const user = await getUnifiedUser();
@@ -192,7 +204,7 @@ export type LedgerPage = { entries: LedgerEntry[]; total: number };
 
 /** Paginated credit ledger query, 20 rows per page, newest first. */
 export async function getLedgerPage(page: number, pageSize = 20): Promise<QueryResult<LedgerPage>> {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getOwnerQueryClient();
   if (!supabase) return empty({ entries: [], total: 0 });
 
   const user = await getUnifiedUser();
@@ -214,7 +226,7 @@ export async function getLedgerPage(page: number, pageSize = 20): Promise<QueryR
 }
 
 export async function getActiveOrderCount(): Promise<QueryResult<number>> {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getOwnerQueryClient();
   if (!supabase) return empty(0);
 
   const user = await getUnifiedUser();
@@ -232,7 +244,7 @@ export async function getActiveOrderCount(): Promise<QueryResult<number>> {
 
 
 export async function getModelCount(): Promise<QueryResult<number>> {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getOwnerQueryClient();
   if (!supabase) return empty(0);
 
   const user = await getUnifiedUser();
@@ -250,7 +262,7 @@ export async function getModelCount(): Promise<QueryResult<number>> {
 /* ------------------------------------------------------------- Seller side */
 
 export async function getSellerProfile(): Promise<QueryResult<SellerProfile | null>> {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getOwnerQueryClient();
   if (!supabase) return empty(null);
 
   let userId: string | null = null;
@@ -287,7 +299,7 @@ const PUBLIC_LISTING_COLUMNS =
   "seller:seller_profiles(studio_name, slug)";
 
 export async function getListings(limit?: number): Promise<QueryResult<Listing[]>> {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getOwnerQueryClient();
   if (!supabase) return empty([]);
 
   const user = await getUnifiedUser();
@@ -320,7 +332,7 @@ export async function getPublishedListingCount(): Promise<QueryResult<number>> {
 }
 
 export async function getSales(limit?: number): Promise<QueryResult<Sale[]>> {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getOwnerQueryClient();
   if (!supabase) return empty([]);
 
   const user = await getUnifiedUser();
@@ -341,7 +353,7 @@ export async function getSales(limit?: number): Promise<QueryResult<Sale[]>> {
 
 /** Lifetime net earnings, in rupees. */
 export async function getSellerEarnings(): Promise<QueryResult<number>> {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getOwnerQueryClient();
   if (!supabase) return empty(0);
 
   const user = await getUnifiedUser();
@@ -361,7 +373,7 @@ export async function getSellerEarnings(): Promise<QueryResult<number>> {
 }
 
 export async function getPayouts(limit?: number): Promise<QueryResult<Payout[]>> {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getOwnerQueryClient();
   if (!supabase) return empty([]);
 
   const user = await getUnifiedUser();
@@ -382,7 +394,7 @@ export async function getPayouts(limit?: number): Promise<QueryResult<Payout[]>>
 
 /** One of the seller's own listings, for the editor. */
 export async function getSellerListing(id: string): Promise<QueryResult<Listing | null>> {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getOwnerQueryClient();
   if (!supabase) return empty(null);
 
   const user = await getUnifiedUser();
@@ -466,7 +478,7 @@ export async function getCategoryCounts(): Promise<QueryResult<Record<string, nu
 /* ------------------------------------------------------------- Library */
 
 export async function getLibrary(): Promise<QueryResult<LibraryItem[]>> {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getOwnerQueryClient();
   if (!supabase) return empty([]);
 
   const user = await getUnifiedUser();
@@ -488,7 +500,7 @@ export async function getLibrary(): Promise<QueryResult<LibraryItem[]>> {
 
 /** Whether the current user already has this listing. Null when signed out. */
 export async function getLibraryEntry(listingId: string): Promise<string | null> {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getOwnerQueryClient();
   if (!supabase) return null;
 
   const user = await getUnifiedUser();
@@ -831,7 +843,7 @@ export async function isModelAcquired(
   modelId: string,
   userId?: string
 ): Promise<boolean> {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getOwnerQueryClient();
   if (!supabase) return false;
 
   let targetUserId = userId;
@@ -1176,7 +1188,7 @@ export async function getFreelancerProfileById(
 }
 
 export async function getMyFreelanceProvider(): Promise<QueryResult<Provider | null>> {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getOwnerQueryClient();
   if (!supabase) return empty(null);
 
   const user = await getUnifiedUser();

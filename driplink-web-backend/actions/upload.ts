@@ -1,7 +1,7 @@
 "use server";
 
 import { getUnifiedUser } from "@/driplink-web-backend/auth/clerk";
-import { getSupabaseServerClient } from "@/driplink-web-backend/db/client";
+import { getSupabaseServerClient, getSupabaseServiceClient } from "@/driplink-web-backend/db/client";
 import { SUPABASE_ANON_KEY } from "@/lib/supabase";
 
 export type UploadSession = {
@@ -42,6 +42,10 @@ export async function getUploadSession(): Promise<UploadSession | null> {
 
 /**
  * Records an uploaded model in the database linked to the verified user.
+ *
+ * Writes through the service-role client: Clerk-authenticated users hold no
+ * Supabase JWT, so RLS on `models` would reject the insert even though the
+ * user has already been verified server-side by getUnifiedUser().
  */
 export async function recordUploadedModel({
   name,
@@ -57,7 +61,7 @@ export async function recordUploadedModel({
     return { error: "You must be signed in to upload a model." };
   }
 
-  const supabase = await getSupabaseServerClient();
+  const supabase = getSupabaseServiceClient();
   if (!supabase) {
     return { error: "Backend database is not connected." };
   }
@@ -97,7 +101,7 @@ export async function updateModelThumbnail({
     return { success: false, error: "Not authenticated" };
   }
 
-  const supabase = await getSupabaseServerClient();
+  const supabase = getSupabaseServiceClient();
   if (!supabase) {
     return { success: false, error: "Backend database not connected." };
   }
@@ -145,7 +149,7 @@ export async function recordUploadedListing({
     return { error: "You must be signed in to create a listing." };
   }
 
-  const supabase = await getSupabaseServerClient();
+  const supabase = getSupabaseServiceClient();
   if (!supabase) {
     return { error: "Backend database is not connected." };
   }
@@ -185,7 +189,7 @@ export async function deleteUploadedModel(id: string): Promise<{ success: boolea
     return { success: false, error: "You must be signed in to delete a model." };
   }
 
-  const supabase = await getSupabaseServerClient();
+  const supabase = getSupabaseServiceClient();
   if (!supabase) {
     return { success: false, error: "Backend database not connected." };
   }

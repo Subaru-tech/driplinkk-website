@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -30,11 +30,9 @@ export function VendorOrderActions({
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setLocalStatus(currentStatus);
-  }, [currentStatus]);
-
-  const activeStatus = localStatus || currentStatus;
+  /* Derive the active status during render rather than mirroring the prop in
+     an effect — a state copy of a prop re-renders twice for no benefit. */
+  const activeStatus = localStatus ?? currentStatus;
 
   const handleAction = async (
     action: "accept" | "print" | "ship" | "deliver" | "cancel"
@@ -104,7 +102,7 @@ export function VendorOrderActions({
           </>
         )}
 
-        {currentStatus === "accepted" && (
+        {activeStatus === "accepted" && (
           <Button
             size="sm"
             onClick={() => handleAction("print")}
@@ -122,7 +120,7 @@ export function VendorOrderActions({
           </Button>
         )}
 
-        {currentStatus === "printing" && (
+        {activeStatus === "printing" && (
           <Button
             size="sm"
             onClick={() => handleAction("ship")}
@@ -140,7 +138,7 @@ export function VendorOrderActions({
           </Button>
         )}
 
-        {currentStatus === "shipped" && (
+        {activeStatus === "shipped" && (
           <Button
             size="sm"
             onClick={() => handleAction("deliver")}
@@ -158,21 +156,21 @@ export function VendorOrderActions({
           </Button>
         )}
 
-        {currentStatus === "delivered" && (
+        {activeStatus === "delivered" && (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-muted px-3 py-1 font-mono text-xs text-accent min-h-[32px]">
             <Clock className="size-3.5" />
             Delivered (Awaiting Buyer)
           </span>
         )}
 
-        {currentStatus === "completed" && (
+        {activeStatus === "completed" && (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 font-mono text-xs text-emerald-400 min-h-[32px]">
             <CheckCircle2 className="size-3.5" />
             Order Completed
           </span>
         )}
 
-        {currentStatus === "cancelled" && (
+        {activeStatus === "cancelled" && (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/10 px-3 py-1 font-mono text-xs text-rose-400 min-h-[32px]">
             <XCircle className="size-3.5" />
             Cancelled

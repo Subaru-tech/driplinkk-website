@@ -3,8 +3,8 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
 import { getUnifiedUser } from "@/driplink-web-backend/auth/clerk";
-import { getSupabaseServerClient } from "@/driplink-web-backend/db/client";
-import type { OrderStatus } from "@/components/ui/status-pill";
+import { getSupabaseServiceClient } from "@/driplink-web-backend/db/client";
+import { ensureAdmin } from "@/lib/admin-guard";
 
 export type AdminActionResult = {
   success: boolean;
@@ -12,34 +12,11 @@ export type AdminActionResult = {
 };
 
 /**
- * Checks if the current authenticated user has the 'admin' role in profiles.
- */
-async function verifyAdminCaller() {
-  const user = await getUnifiedUser();
-  if (!user) {
-    return { ok: false as const, error: "You must be signed in to perform this action." };
-  }
-
-  const supabase = await getSupabaseServerClient();
-  if (!supabase) {
-    return { ok: false as const, error: "Database backend is not connected." };
-  }
-
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (error || profile?.role !== "admin") {
-    return { ok: false as const, error: "Unauthorized: Admin privileges required." };
-  }
-
-  return { ok: true as const, supabase, user };
-}
-
-/**
  * Updates a listing's status to 'published' or 'rejected'.
+ *
+ * Writes go through the service-role client: RLS on `listings` doesn't grant
+ * admins a client-posable update path, so the privilege lives here — behind a
+ * server-verified role check, never behind data the browser sent.
  */
 export async function updateListingStatusAdmin({
   listingId,
@@ -48,12 +25,21 @@ export async function updateListingStatusAdmin({
   listingId: string;
   status: "published" | "rejected";
 }): Promise<AdminActionResult> {
-  const authCheck = await verifyAdminCaller();
-  if (!authCheck.ok) {
-    return { success: false, error: authCheck.error };
+  const guard = await ensureAdmin();
+  if (!guard.ok) {
+    return { success: false, error: guard.error };
   }
 
-  const { supabase } = authCheck;
+  const { data: current, error: fetchErr } = await guard.client
+    .from("listings")
+    .select("id")
+    .eq("id", listingId)
+    .maybeSingle();
+
+  if (fetchErr || !current) {
+    return { success: false, error: "Listing not found." };
+  }
+
   const updates: Record<string, unknown> = {
     status,
     updated_at: new Date().toISOString(),
@@ -63,7 +49,7 @@ export async function updateListingStatusAdmin({
     updates.published_at = new Date().toISOString();
   }
 
-  const { error } = await supabase
+  const { error } = await guard.client
     .from("listings")
     .update(updates)
     .eq("id", listingId);
@@ -75,7 +61,7 @@ export async function updateListingStatusAdmin({
 
   revalidatePath("/admin/listings");
   revalidatePath("/admin");
-  revalidatePath("/mart");
+  revalidatePath("/models");
   return { success: true };
 }
 
@@ -91,14 +77,23 @@ export async function updateMartOrderAdmin({
   orderId: string;
   assignedVendor?: string | null;
   vendorNotes?: string | null;
-  status?: OrderStatus;
+  status?: string;
 }): Promise<AdminActionResult> {
-  const authCheck = await verifyAdminCaller();
-  if (!authCheck.ok) {
-    return { success: false, error: authCheck.error };
+  const guard = await ensureAdmin();
+  if (!guard.ok) {
+    return { success: false, error: guard.error };
   }
 
-  const { supabase } = authCheck;
+  const { data: current, error: fetchErr } = await guard.client
+    .from("mart_orders")
+    .select("id")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (fetchErr || !current) {
+    return { success: false, error: "Order not found." };
+  }
+
   const updates: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   };
@@ -110,10 +105,11 @@ export async function updateMartOrderAdmin({
     updates.vendor_notes = vendorNotes?.trim() || null;
   }
   if (status !== undefined) {
-    updates.status = status;
+    // The database stores lowercase statuses; the UI sends Title Case.
+    updates.status = status.toLowerCase();
   }
 
-  const { error } = await supabase
+  const { error } = await guard.client
     .from("mart_orders")
     .update(updates)
     .eq("id", orderId);
@@ -127,6 +123,5 @@ export async function updateMartOrderAdmin({
   revalidatePath("/admin");
   revalidatePath("/dashboard/mart-orders");
   revalidatePath(`/dashboard/mart-orders/${orderId}`);
-  revalidatePath("/dashboard/mart-orders/[id]", "page");
   return { success: true };
 }

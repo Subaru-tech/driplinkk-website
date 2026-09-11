@@ -35,23 +35,22 @@ export function CinematicHero() {
 
       {/* Hero copy block: sits in upper viewport on mobile, centered on desktop */}
       <div className="relative mx-auto flex w-full max-w-content flex-col items-center px-6 pt-6 pb-12 sm:pt-10 sm:pb-20 text-center lg:items-start lg:px-12 lg:py-24 lg:text-left">
-        <div className="flex flex-col items-center lg:max-w-xl lg:items-start">
+        <div className="flex flex-col items-center lg:max-w-[36rem] xl:max-w-[42rem] lg:items-start">
           <p className="hero-pull tech-label mb-3 sm:mb-8 text-accent-2">
             Idea &nbsp;→&nbsp; Geometry &nbsp;→&nbsp; Part
           </p>
 
           {/* Hand-broken on desktop */}
           <h1 className="hero-pull display-xl font-display text-balance text-fg lg:text-pretty">
-            Design it,
+            One-stop platform
             <br className="hidden lg:inline" />
-            {" "}refine it,
+            {" "}for turning ideas
             <br className="hidden lg:inline" />
-            {" "}<span className="text-accent-gradient">print it.</span>
+            {" "}<span className="text-accent-gradient">into products.</span>
           </h1>
 
           <p className="hero-pull mt-4 sm:mt-8 max-w-md text-base sm:text-lg text-pretty text-muted">
-            One pipeline from idea to printed part. Generate a model, make it manufacturable, and
-            send it to a printer — without ever switching tools.
+            Design, build, source, and manufacture — without the friction.
           </p>
 
           <div className="hero-pull mt-6 sm:mt-10 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center">

@@ -84,7 +84,13 @@ export async function updateUserProfile({
 }
 
 /**
- * Deletes user models, files, library items, and profile record.
+ * Deletes the account and everything it owns.
+ *
+ * Runs on the service-role client: RLS would block most of these deletes for
+ * a Clerk-authenticated user (no Supabase JWT) and several tables — listings,
+ * model_acquisitions, freelance_requests — have no user-facing delete path at
+ * all. Every step is best-effort so one orphaned row can't strand the rest;
+ * failures are logged, never silent.
  */
 export async function deleteUserAccount(): Promise<{ success: boolean; error?: string }> {
   const user = await getUnifiedUser();
@@ -92,37 +98,172 @@ export async function deleteUserAccount(): Promise<{ success: boolean; error?: s
     return { success: false, error: "You must be signed in to delete your account." };
   }
 
-  const supabase = await getSupabaseServerClient();
-  if (!supabase) {
+  const serviceSupabase = getSupabaseServiceClient();
+  if (!serviceSupabase) {
     return { success: false, error: "Database backend is not connected." };
   }
 
   try {
-    // 1. Clean up user models & storage files
-    const { data: userModels } = await supabase
+    // 1. Own models (marketplace + uploads) and their storage blobs
+    const { data: ownedModels } = await serviceSupabase
       .from("models")
-      .select("id, storage_path")
-      .eq("owner_id", user.id);
+      .select("id, storage_path, file_path, preview_image_paths")
+      .or(`owner_id.eq.${user.id},seller_user_id.eq.${user.id}`);
 
-    if (userModels && userModels.length > 0) {
-      const storagePaths = userModels
-        .map((m) => m.storage_path)
-        .filter((p): p is string => Boolean(p));
+    const modelIds = (ownedModels ?? []).map((m) => m.id);
 
-      if (storagePaths.length > 0) {
-        await supabase.storage.from("model-files").remove(storagePaths);
-      }
+    const storagePaths = (ownedModels ?? [])
+      .flatMap((m) => [m.storage_path, m.file_path, ...(m.preview_image_paths ?? [])])
+      .filter((p): p is string => Boolean(p));
 
-      await supabase.from("models").delete().eq("owner_id", user.id);
+    if (storagePaths.length > 0) {
+      await serviceSupabase.storage.from("model-files").remove(storagePaths);
     }
 
-    // 2. Clean up user library items
-    await supabase.from("library_items").delete().eq("user_id", user.id);
+    // 2. Acquisitions must go before the models they reference
+    const { error: acqErr } = await serviceSupabase
+      .from("model_acquisitions")
+      .delete()
+      .eq("user_id", user.id);
+    if (acqErr) console.warn("deleteUserAccount: model_acquisitions:", acqErr.message);
 
-    // 3. Clean up profile record
-    await supabase.from("profiles").delete().eq("id", user.id);
+    if (modelIds.length > 0) {
+      const { error: modelErr } = await serviceSupabase
+        .from("models")
+        .delete()
+        .in("id", modelIds);
+      if (modelErr) console.warn("deleteUserAccount: models:", modelErr.message);
+    }
 
-    // 4. Delete Clerk user if applicable
+    // 3. Own listings (marketplace drafts) and their files
+    const { data: ownListings } = await serviceSupabase
+      .from("listings")
+      .select("id, file_path")
+      .eq("seller_id", user.id);
+
+    const listingPaths = (ownListings ?? [])
+      .map((l) => l.file_path)
+      .filter((p): p is string => Boolean(p));
+
+    if (listingPaths.length > 0) {
+      await serviceSupabase.storage.from("model-files").remove(listingPaths);
+      await serviceSupabase.storage
+        .from("model-art")
+        .remove((ownListings ?? []).map((l) => `${user.id}/listings-${l.id}.png`));
+    }
+
+    const { error: listingErr } = await serviceSupabase
+      .from("listings")
+      .delete()
+      .eq("seller_id", user.id);
+    if (listingErr) console.warn("deleteUserAccount: listings:", listingErr.message);
+
+    // 4. Freelance footprint: provider row, profile, buyer + freelancer-side
+    // requests, and any reference/deliverable files
+    const { data: providers } = await serviceSupabase
+      .from("providers")
+      .select("id, type")
+      .eq("user_id", user.id);
+
+    const providerIds = (providers ?? []).map((p) => p.id);
+
+    if (providerIds.length > 0) {
+      const { data: deliverables } = await serviceSupabase
+        .from("freelance_requests")
+        .select("final_file_path")
+        .eq("freelancer_provider_id", providerIds[0])
+        .not("final_file_path", "is", null);
+
+      const deliverablePaths = (deliverables ?? [])
+        .map((d) => d.final_file_path)
+        .filter((p): p is string => Boolean(p));
+      if (deliverablePaths.length > 0) {
+        await serviceSupabase.storage.from("freelance-deliverables").remove(deliverablePaths);
+      }
+
+      const { error: fpErr } = await serviceSupabase
+        .from("freelancer_profiles")
+        .delete()
+        .in("provider_id", providerIds);
+      if (fpErr) console.warn("deleteUserAccount: freelancer_profiles:", fpErr.message);
+
+      const { error: vpErr } = await serviceSupabase
+        .from("vendor_profiles")
+        .delete()
+        .in("provider_id", providerIds);
+      if (vpErr) console.warn("deleteUserAccount: vendor_profiles:", vpErr.message);
+
+      const { error: provErr } = await serviceSupabase
+        .from("providers")
+        .delete()
+        .in("id", providerIds);
+      if (provErr) console.warn("deleteUserAccount: providers:", provErr.message);
+    }
+
+    const { data: buyerRequests } = await serviceSupabase
+      .from("freelance_requests")
+      .select("reference_file_paths")
+      .eq("buyer_user_id", user.id);
+
+    const referencePaths = (buyerRequests ?? [])
+      .flatMap((r) => r.reference_file_paths ?? [])
+      .filter((p): p is string => Boolean(p));
+    if (referencePaths.length > 0) {
+      await serviceSupabase.storage.from("freelance-deliverables").remove(referencePaths);
+    }
+
+    const { error: reqErr } = await serviceSupabase
+      .from("freelance_requests")
+      .delete()
+      .eq("buyer_user_id", user.id);
+    if (reqErr) console.warn("deleteUserAccount: freelance_requests:", reqErr.message);
+
+    // 5. Mart orders the user placed (quote_requests cascade via FK RESTRICT
+    // on orders, so delete orders first, then their quote requests)
+    const { data: quoteIds } = await serviceSupabase
+      .from("quote_requests")
+      .select("id, file_path")
+      .eq("user_id", user.id);
+
+    const { error: orderErr } = await serviceSupabase
+      .from("mart_orders")
+      .delete()
+      .eq("buyer_user_id", user.id);
+    if (orderErr) console.warn("deleteUserAccount: mart_orders:", orderErr.message);
+
+    if (quoteIds && quoteIds.length > 0) {
+      const paths = quoteIds.map((q) => q.file_path).filter((p): p is string => Boolean(p));
+      if (paths.length > 0) {
+        await serviceSupabase.storage.from("model-files").remove(paths);
+      }
+      const { error: qrErr } = await serviceSupabase
+        .from("quote_requests")
+        .delete()
+        .in("id", quoteIds.map((q) => q.id));
+      if (qrErr) console.warn("deleteUserAccount: quote_requests:", qrErr.message);
+    }
+
+    // 6. Legacy library + seller profile
+    const { error: libErr } = await serviceSupabase
+      .from("library_items")
+      .delete()
+      .eq("user_id", user.id);
+    if (libErr) console.warn("deleteUserAccount: library_items:", libErr.message);
+
+    const { error: spErr } = await serviceSupabase
+      .from("seller_profiles")
+      .delete()
+      .eq("id", user.id);
+    if (spErr) console.warn("deleteUserAccount: seller_profiles:", spErr.message);
+
+    // 7. Profile record last — it anchors everything above
+    const { error: profileErr } = await serviceSupabase
+      .from("profiles")
+      .delete()
+      .eq("id", user.id);
+    if (profileErr) console.warn("deleteUserAccount: profiles:", profileErr.message);
+
+    // 8. Delete the Clerk user if applicable
     if (user.source === "clerk" && isClerkConfigured) {
       try {
         const clerk = await clerkClient();

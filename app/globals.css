@@ -24,11 +24,16 @@
      and secondary/tertiary text are kept 1.37x apart so the type hierarchy
      survives — a solver that only chases AA collapses them into one grey.
      ---------------------------------------------------------------------- */
-  --bg-void: #262b21; /* deepest — hero backdrop, full-bleed floors */
-  --bg-primary: #31372b; /* forest — page */
-  --bg-secondary: #3a4133; /* cards, panels */
-  --bg-tertiary: #3f4737; /* hover states, nested panels */
-  --border: #4b5442; /* decorative dividers — no contrast requirement */
+  --bg-void: #262b21;
+  /* deepest — hero backdrop, full-bleed floors */
+  --bg-primary: #31372b;
+  /* forest — page */
+  --bg-secondary: #3a4133;
+  /* cards, panels */
+  --bg-tertiary: #3f4737;
+  /* hover states, nested panels */
+  --border: #4b5442;
+  /* decorative dividers — no contrast requirement */
   --border-strong: #626d56;
   /* Interactive control boundaries (secondary buttons, inputs, checkboxes).
      WCAG 1.4.11 wants 3:1 for these and BOTH border tokens above fail it on
@@ -39,18 +44,24 @@
   --text-secondary: #c7cbb9;
   --text-tertiary: #a9af97;
 
-  --accent: #faf7ee; /* cream — CTA / focus / signal */
+  --accent: #faf7ee;
+  /* cream — CTA / focus / signal */
   --accent-hover: #ece8db;
   --accent-muted: #3f4737;
-  --accent-contrast: #31372b; /* dark text ON accent: 11.45:1 */
+  --accent-contrast: #31372b;
+  /* dark text ON accent: 11.45:1 */
 
-  --accent-2: #a9d26b; /* foliage — growth / links / canopy */
+  --accent-2: #a9d26b;
+  /* foliage — growth / links / canopy */
   --accent-2-muted: #2f3a22;
 
   /* Canvas-only material tones for the hero scene. */
-  --machine: #97a189; /* printer frame — sage, quieter than the tree */
-  --bark: #c08b52; /* trunk + branches */
-  --brass: #d9b45c; /* lead screw, pulleys — the machine's warm metal */
+  --machine: #97a189;
+  /* printer frame — sage, quieter than the tree */
+  --bark: #c08b52;
+  /* trunk + branches */
+  --brass: #d9b45c;
+  /* lead screw, pulleys — the machine's warm metal */
 
   /* ------------------------------------------------------------------------
      Brand logo.
@@ -63,8 +74,10 @@
      identity — the L is always lighter than the D — holds in both.
      DARK: L literal white, D lifted to a sage mid tone.
      ---------------------------------------------------------------------- */
-  --logo-paper: #f7f7f5; /* L + "Drip" — literal artwork white */
-  --logo-ink: #829073; /* D + "Link" — lifted; #141414 is invisible here */
+  --logo-paper: #f7f7f5;
+  /* L + "Drip" — literal artwork white */
+  --logo-ink: #829073;
+  /* D + "Link" — lifted; #141414 is invisible here */
 
   --danger: #ffafa8;
   --danger-muted: #43302c;
@@ -80,12 +93,14 @@
    Per spec — do not reinvent a second palette. */
 [data-theme="light"] {
   --bg-void: #e8e5d9;
-  --bg-primary: #faf7ee; /* cream — page */
+  --bg-primary: #faf7ee;
+  /* cream — page */
   --bg-secondary: #f2eee1;
   --bg-tertiary: #e6e3d8;
   --border: #d8d4c5;
   --border-strong: #b5b0a0;
-  --border-control: #8b8778; /* 3:1 on cream — see the dark-mode note */
+  --border-control: #8b8778;
+  /* 3:1 on cream — see the dark-mode note */
 
   --text-primary: #262b21;
   --text-secondary: #4d543f;
@@ -107,8 +122,10 @@
   --brass: #8a6d1f;
   /* LIGHT: D keeps the literal artwork black; the L shifts down, because
      white-on-cream is 1.00:1 — the exact bug this fixes. */
-  --logo-paper: #848073; /* L + "Drip" — darkened to clear the cream */
-  --logo-ink: #141414; /* D + "Link" — literal artwork black */
+  --logo-paper: #848073;
+  /* L + "Drip" — darkened to clear the cream */
+  --logo-ink: #141414;
+  /* D + "Link" — literal artwork black */
 
   --danger: #c02428;
   --danger-muted: #fbe0e1;
@@ -127,20 +144,30 @@
 
 @theme inline {
   /* Surfaces */
-  --color-void: var(--bg-void); /* --bg-void      → bg-void     */
-  --color-canvas: var(--bg-primary); /* --bg-primary   → bg-canvas   */
-  --color-surface: var(--bg-secondary); /* --bg-secondary → bg-surface  */
-  --color-raised: var(--bg-tertiary); /* --bg-tertiary  → bg-raised   */
+  --color-void: var(--bg-void);
+  /* --bg-void      → bg-void     */
+  --color-canvas: var(--bg-primary);
+  /* --bg-primary   → bg-canvas   */
+  --color-surface: var(--bg-secondary);
+  /* --bg-secondary → bg-surface  */
+  --color-raised: var(--bg-tertiary);
+  /* --bg-tertiary  → bg-raised   */
 
   /* Lines */
-  --color-line: var(--border); /* --border         → border-line         */
-  --color-line-strong: var(--border-strong); /* --border-strong  → border-line-strong  */
-  --color-line-control: var(--border-control); /* --border-control → border-line-control */
+  --color-line: var(--border);
+  /* --border         → border-line         */
+  --color-line-strong: var(--border-strong);
+  /* --border-strong  → border-line-strong  */
+  --color-line-control: var(--border-control);
+  /* --border-control → border-line-control */
 
   /* Text */
-  --color-fg: var(--text-primary); /* --text-primary   → text-fg    */
-  --color-muted: var(--text-secondary); /* --text-secondary → text-muted */
-  --color-faint: var(--text-tertiary); /* --text-tertiary  → text-faint */
+  --color-fg: var(--text-primary);
+  /* --text-primary   → text-fg    */
+  --color-muted: var(--text-secondary);
+  /* --text-secondary → text-muted */
+  --color-faint: var(--text-tertiary);
+  /* --text-tertiary  → text-faint */
 
   /* Accent */
   --color-accent: var(--accent);
@@ -164,19 +191,26 @@
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
 
-  --text-xs: 0.75rem; /* 12px — labels, meta      */
+  --text-xs: 0.75rem;
+  /* 12px — labels, meta      */
   --text-xs--line-height: 1rem;
-  --text-sm: 0.875rem; /* 14px — body secondary, nav */
+  --text-sm: 0.875rem;
+  /* 14px — body secondary, nav */
   --text-sm--line-height: 1.25rem;
-  --text-base: 1rem; /* 16px — body             */
+  --text-base: 1rem;
+  /* 16px — body             */
   --text-base--line-height: 1.5rem;
-  --text-lg: 1.125rem; /* 18px — card titles      */
+  --text-lg: 1.125rem;
+  /* 18px — card titles      */
   --text-lg--line-height: 1.625rem;
-  --text-xl: 1.5rem; /* 24px — section headers  */
+  --text-xl: 1.5rem;
+  /* 24px — section headers  */
   --text-xl--line-height: 2rem;
-  --text-2xl: 2rem; /* 32px — page titles      */
+  --text-2xl: 2rem;
+  /* 32px — page titles      */
   --text-2xl--line-height: 2.5rem;
-  --text-3xl: 3rem; /* 48px — hero headline    */
+  --text-3xl: 3rem;
+  /* 48px — hero headline    */
   --text-3xl--line-height: 3.25rem;
 
   /* Radii — spec §1.4 (cards 12px, inputs/buttons 8px) */
@@ -184,15 +218,22 @@
   --radius-control: 0.5rem;
 
   /* Content widths — spec §1.3 */
-  --container-content: 80rem; /* 1280px — marketing pages */
-  --container-dash: 70rem; /* 1120px — dashboard       */
-  --container-prose: 45rem; /* 720px  — About / legal   */
+  --container-content: 80rem;
+  /* 1280px — marketing pages */
+  --container-dash: 70rem;
+  /* 1120px — dashboard       */
+  --container-prose: 45rem;
+  /* 720px  — About / legal   */
 
   /* Breakpoints — spec §7 (these match Tailwind defaults; declared for clarity) */
-  --breakpoint-sm: 40rem; /* 640px  */
-  --breakpoint-md: 48rem; /* 768px  */
-  --breakpoint-lg: 64rem; /* 1024px */
-  --breakpoint-xl: 80rem; /* 1280px */
+  --breakpoint-sm: 40rem;
+  /* 640px  */
+  --breakpoint-md: 48rem;
+  /* 768px  */
+  --breakpoint-lg: 64rem;
+  /* 1024px */
+  --breakpoint-xl: 80rem;
+  /* 1280px */
 }
 
 /* ============================================================================
@@ -249,12 +290,15 @@
 }
 
 @layer utilities {
+
   /* Skeleton pulse — spec §1.4 loading state */
   @keyframes dl-pulse {
+
     0%,
     100% {
       opacity: 1;
     }
+
     50% {
       opacity: 0.45;
     }
@@ -269,6 +313,7 @@
       opacity: 0;
       transform: translateY(8px) scale(0.98);
     }
+
     to {
       opacity: 1;
       transform: translateY(0) scale(1);
@@ -283,6 +328,7 @@
     from {
       opacity: 0;
     }
+
     to {
       opacity: 1;
     }
@@ -297,6 +343,7 @@
       opacity: 0;
       transform: translateY(8px) scale(0.97);
     }
+
     to {
       opacity: 1;
       transform: translateY(0) scale(1);
@@ -330,19 +377,15 @@
 
   /* Rim lighting behind a section — the "key light" of the grade. */
   .glow-accent {
-    background: radial-gradient(
-      60% 50% at 50% 50%,
-      color-mix(in oklab, var(--accent) 30%, transparent),
-      transparent 70%
-    );
+    background: radial-gradient(60% 50% at 50% 50%,
+        color-mix(in oklab, var(--accent) 30%, transparent),
+        transparent 70%);
   }
 
   .glow-accent-2 {
-    background: radial-gradient(
-      55% 50% at 50% 50%,
-      color-mix(in oklab, var(--accent-2) 22%, transparent),
-      transparent 70%
-    );
+    background: radial-gradient(55% 50% at 50% 50%,
+        color-mix(in oklab, var(--accent-2) 22%, transparent),
+        transparent 70%);
   }
 
   /* Vignette that seats full-bleed sections into the page. */
@@ -352,22 +395,20 @@
 
   /* Hairline that fades at both ends — used as a section divider. */
   .rule-fade {
-    background: linear-gradient(
-      90deg,
-      transparent,
-      var(--border-strong) 18%,
-      var(--border-strong) 82%,
-      transparent
-    );
+    background: linear-gradient(90deg,
+        transparent,
+        var(--border-strong) 18%,
+        var(--border-strong) 82%,
+        transparent);
   }
 
   /* Display type. Large sizes need tighter tracking and leading than body
      copy — the defaults are tuned for paragraphs and look loose and amateur
      at 96px. Optical tightening scales with size. */
   .display-xl {
-    font-size: clamp(2.75rem, 7.4vw, 5.75rem);
-    line-height: 0.92;
-    letter-spacing: -0.042em;
+    font-size: clamp(2.25rem, 5.2vw, 4.5rem);
+    line-height: 0.98;
+    letter-spacing: -0.038em;
     font-weight: 700;
     font-feature-settings: "ss01", "cv01";
   }
@@ -393,6 +434,7 @@
   .tick-rule {
     position: relative;
   }
+
   .tick-rule::before {
     content: "";
     position: absolute;
@@ -405,11 +447,9 @@
 
   /* Molten gradient text for the one word that carries the headline. */
   .text-accent-gradient {
-    background: linear-gradient(
-      100deg,
-      var(--accent) 0%,
-      color-mix(in oklab, var(--accent) 55%, var(--accent-2)) 100%
-    );
+    background: linear-gradient(100deg,
+        var(--accent) 0%,
+        color-mix(in oklab, var(--accent) 55%, var(--accent-2)) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -425,6 +465,7 @@
     from {
       transform: translateX(0);
     }
+
     to {
       transform: translateX(-50%);
     }
@@ -439,6 +480,7 @@
     from {
       transform: translate3d(-3%, -2%, 0) scale(1);
     }
+
     to {
       transform: translate3d(3%, 2%, 0) scale(1.12);
     }
@@ -530,12 +572,12 @@
   /* The rest of the page holds still until the machine has assembled, so the
      intro isn't competing with content fading in behind it. Scoped to
      "running" only, so if JS never sets the attribute nothing is hidden. */
-  [data-intro="running"] main > *:not(:first-child),
+  [data-intro="running"] main>*:not(:first-child),
   [data-intro="running"] footer {
     opacity: 0;
   }
 
-  main > *,
+  main>*,
   footer {
     transition: opacity 500ms ease 60ms;
   }
@@ -543,6 +585,7 @@
   .scrollbar-none {
     scrollbar-width: none;
   }
+
   .scrollbar-none::-webkit-scrollbar {
     display: none;
   }
@@ -607,13 +650,11 @@
     inset-inline-start: 0;
     block-size: 1px;
     inline-size: 100%;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      var(--accent) 35%,
-      var(--accent) 65%,
-      transparent 100%
-    );
+    background: linear-gradient(90deg,
+        transparent 0%,
+        var(--accent) 35%,
+        var(--accent) 65%,
+        transparent 100%);
     transform: translateX(-100%);
     opacity: 0;
   }
@@ -628,12 +669,15 @@
       transform: translateX(-100%);
       opacity: 0;
     }
+
     12% {
       opacity: 1;
     }
+
     88% {
       opacity: 1;
     }
+
     100% {
       transform: translateX(100%);
       opacity: 0;
@@ -704,7 +748,7 @@
     transform-origin: 50% 0;
   }
 
-  @media (width >= 48rem) {
+  @media (width >=48rem) {
     .step-rail-fill {
       transform: scaleX(0);
       transform-origin: 0 50%;
@@ -712,6 +756,7 @@
   }
 
   @supports (animation-timeline: scroll()) {
+
     /* Print-progress rail under the sticky nav: fills as you move down the
        document, like a job progress bar. */
     .scroll-rail {
@@ -723,6 +768,7 @@
       from {
         transform: scaleX(0);
       }
+
       to {
         transform: scaleX(1);
       }
@@ -769,16 +815,18 @@
       from {
         transform: scaleY(0);
       }
+
       to {
         transform: scaleY(1);
       }
     }
 
-    @media (width >= 48rem) {
+    @media (width >=48rem) {
       @keyframes dl-step-rail {
         from {
           transform: scaleX(0);
         }
+
         to {
           transform: scaleX(1);
         }
@@ -788,6 +836,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {

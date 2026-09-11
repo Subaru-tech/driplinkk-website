@@ -4,13 +4,17 @@ import { DangerZone } from "@/components/dashboard/danger-zone";
 import { PasswordSection } from "@/components/dashboard/password-section";
 import { ProfileSection } from "@/components/dashboard/profile-section";
 import { SessionsSection } from "@/components/dashboard/sessions-section";
-import { getProfile, getUnifiedUser } from "@/driplink-web-backend";
+import { getClerkSessions, getProfile, getUnifiedUser } from "@/driplink-web-backend";
 
 export const metadata: Metadata = { title: "Account" };
 
 export default async function AccountPage() {
   const [user, profileResult] = await Promise.all([getUnifiedUser(), getProfile()]);
   const profile = profileResult.data;
+
+  /* Real sessions only exist for Clerk accounts — Supabase's SDK has no
+     "list my sessions" call, so those users see the honest empty state. */
+  const sessions = user?.source === "clerk" ? await getClerkSessions() : [];
 
   const email = user?.email ?? "";
   const name = profile?.full_name ?? user?.name ?? "";
@@ -30,9 +34,7 @@ export default async function AccountPage() {
 
       <PasswordSection email={email} authSource={authSource} />
 
-      {/* Empty until Track 2 exposes a server route for session listing —
-          see the note in SessionsSection. */}
-      <SessionsSection sessions={[]} />
+      <SessionsSection sessions={sessions} provider={authSource} />
 
       <DangerZone email={email} />
     </div>

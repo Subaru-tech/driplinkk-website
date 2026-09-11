@@ -1,12 +1,11 @@
 "use client";
 
 import { Check, Store } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { ROLES } from "@/lib/roles";
-import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { becomeSeller } from "@/driplink-web-backend/actions/seller";
 
 /**
  * Opening a storefront — the thing that used to be a checkbox at signup.
@@ -15,14 +14,12 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
  * which becomes the storefront slug. Everything else about selling is decided
  * per listing.
  *
- * The insert goes through `become_seller()` rather than a direct write: the
- * role column is immutable from a client session, and the `seller_profiles`
- * policy requires you to already be a seller. Both guards stay; the function
- * is the one authorised way through.
+ * The write goes through the `becomeSeller` server action rather than a direct
+ * browser RPC: the role column is immutable from a client session and the
+ * `seller_profiles` policy requires you to already be a seller. The server
+ * action verifies the session and completes the privileged call.
  */
 export function StartSelling() {
-  const router = useRouter();
-
   const [studioName, setStudioName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<string | undefined>();
@@ -38,28 +35,14 @@ export function StartSelling() {
     }
     setFieldError(undefined);
 
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) {
-      setError("Selling isn't available yet — the backend isn't connected.");
-      return;
-    }
-
     setPending(true);
-    const { error: rpcError } = await supabase.rpc("become_seller", {
-      studio: studioName.trim(),
-    });
+    const res = await becomeSeller(studioName.trim());
     setPending(false);
 
-    if (rpcError) {
-      setError(
-        rpcError.message.includes("function")
-          ? "The seller onboarding function isn't deployed yet. Run the backend migrations."
-          : rpcError.message,
-      );
+    if (!res.success) {
+      setError(res.error || "Couldn't open your storefront. Try again.");
       return;
     }
-
-    router.refresh();
   }
 
   return (

@@ -188,7 +188,8 @@ export function MartQuoteCalculator({ isSignedIn = false }: MartQuoteCalculatorP
       if (!res.success || !res.orderId) {
         setErrorMessage(res.error || "Failed to place order.");
       } else {
-        window.location.href = "/dashboard/mart-orders";
+        router.push("/dashboard/mart-orders");
+        return;
       }
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : "An error occurred while creating order.");

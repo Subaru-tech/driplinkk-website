@@ -6,11 +6,21 @@ import type { MartOrder, MartVendorOrder } from "@/lib/types";
 type AnyMartOrder = MartOrder | MartVendorOrder;
 
 function getOrderDisplay(order: AnyMartOrder) {
-  const o = order as any;
-  const ref = o.reference || `DL-${o.id.slice(0, 6).toUpperCase()}`;
-  const modelName = o.model_name || (o.material ? `${o.material.toUpperCase()} Custom Print` : "3D Print Model");
-  const price = typeof o.total_inr === "number" ? o.total_inr : typeof o.price === "number" ? o.price : 0;
-  return { ref, modelName, price, status: o.status, createdAt: o.created_at, counterparty: o.counterparty_name };
+  const legacy = "reference" in order ? order : null;
+  const vendorOrder = legacy ? null : (order as MartVendorOrder);
+  const ref = legacy?.reference ?? `DL-${order.id.slice(0, 6).toUpperCase()}`;
+  const modelName =
+    legacy?.model_name ??
+    (vendorOrder?.material ? `${vendorOrder.material.toUpperCase()} Custom Print` : "3D Print Model");
+  const price = legacy?.total_inr ?? vendorOrder?.price ?? 0;
+  return {
+    ref,
+    modelName,
+    price,
+    status: order.status,
+    createdAt: order.created_at,
+    counterparty: vendorOrder?.counterparty_name ?? null,
+  };
 }
 
 /** Compact row used in the Overview "Recent Mart Orders" list — spec §6.1. */

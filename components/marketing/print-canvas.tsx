@@ -88,8 +88,8 @@ const MARK_L_PATH = "M0 6.8 L15.5 20.7 V50.8 H56 V68 H0 Z";
 
 const BBOX = {
   left: -M.baseW / 2 - 4,
-  right: M.spool.x + M.spool.r + 4,
-  top: M.frameTop + M.barH + 6,
+  right: M.spool.x + M.spool.r + 6,
+  top: M.frameTop + 28,
   bottom: -12,
 };
 
@@ -365,20 +365,38 @@ export function PrintCanvas({ className }: { className?: string }) {
          viewport width (the canvas box is ~15px narrower, so 768 used to fall
          through to the narrow branch). Its numbers are tuned here for the
          first time: 0.44 put the canopy 11px into the CTA row. */
-      const heightFrac = wide ? 0.88 : medium ? 0.36 : 0.25;
-      /* Width is the binding constraint on wide layouts, so this is the dial
-         that actually controls how broad the machine reads. */
-      const widthFrac = wide ? 0.52 : 0.86;
-
-      unit = Math.min((height * heightFrac) / modelH, (width * widthFrac) / modelW);
-      /* Centre on the model's bounding box, not on x=0 — the side-mounted
-         spool makes the machine asymmetric. */
       const bboxCx = (bbox.left + bbox.right) / 2;
-      const anchorX = wide ? width * 0.7 : width * 0.5;
-      originX = anchorX - bboxCx * unit;
-      originY = wide
-        ? height * 0.5 + ((bbox.top + bbox.bottom) / 2) * unit
-        : height * 0.99;
+
+      if (wide) {
+        const topSafe = 76; // keep comfortably below 64px navbar
+        const bottomSafe = 28;
+        const rightSafe = 28;
+        const availH = Math.max(160, height - topSafe - bottomSafe);
+
+        // Safe left boundary to prevent overlapping the hero copy block
+        const textRightBound = Math.min(width * 0.48, 620);
+        const availW = Math.max(160, width - textRightBound - rightSafe);
+
+        unit = Math.min(availH / modelH, availW / modelW, 2.3);
+
+        const machineW = modelW * unit;
+        const machineH = modelH * unit;
+
+        // Position horizontally: right-aligned inside safe area without overlapping copy
+        const rightEdge = width - rightSafe;
+        const machineLeft = Math.max(textRightBound, rightEdge - machineW);
+        originX = machineLeft - bbox.left * unit;
+
+        // Position vertically: centered in available vertical space below navbar
+        const topEdge = topSafe + (availH - machineH) / 2;
+        originY = topEdge + bbox.top * unit;
+      } else {
+        const heightFrac = medium ? 0.38 : 0.28;
+        const widthFrac = 0.88;
+        unit = Math.min((height * heightFrac) / modelH, (width * widthFrac) / modelW);
+        originX = width * 0.5 - bboxCx * unit;
+        originY = height * 0.98;
+      }
 
       /* ---- assembly ------------------------------------------------------
          Each subassembly flies in from its own direction, tumbling as it goes,
@@ -459,7 +477,7 @@ export function PrintCanvas({ className }: { className?: string }) {
       const scrH = 28;
       rect(scrX, scrY, scrW, scrH, machine, 0.75, 0.28, 2);
       if (detail) {
-        label("DripLink Core", scrX + 4, scrY + scrH - 5, 5.4, cream, 0.85);
+        label("Workshop Core", scrX + 4, scrY + scrH - 5, 5.4, cream, 0.85);
         label("Printing...", scrX + 4, scrY + scrH - 13, 5, foliage, 0.9);
         /* progress bar reflecting the real build state */
         rect(scrX + 4, scrY + 6, scrW - 30, 4, machine, 0.55, 0.12, 1, 1);
@@ -582,80 +600,6 @@ export function PrintCanvas({ className }: { className?: string }) {
       group(7, 0, M.frameTop + M.barH / 2, 0, 130, 0, () => {
         rect(-M.postX - M.postW / 2, M.frameTop, M.postX * 2 + M.postW, M.barH, machine, 0.85, 0.2, 2);
       });
-      if (detail) {
-        /* The real DripLink monogram, badged on the crossbar. Same path data
-           as the DOM logo, so the two can never drift apart.
-
-           During the intro this badge is choreographed: the mark slides in
-           from the right of frame, the wordmark wipes on after it, and then
-           the whole badge hands off to a DOM element that flies up to the nav.
-           `markGone` is the moment the canvas stops drawing it and the DOM
-           flyer takes over from the exact same screen position. */
-        const markH = 11;
-        const markW = (markH * 61) / 68;
-        const barMidY = M.frameTop + M.barH / 2;
-        const markX = -26;
-
-        const markIn = Number.isFinite(introT)
-          ? clamp01((introT - INTRO.ASSEMBLE_END) / (INTRO.MARK_IN_END - INTRO.ASSEMBLE_END))
-          : 1;
-        const wordIn = Number.isFinite(introT)
-          ? clamp01((introT - INTRO.MARK_IN_END) / (INTRO.WORD_IN_END - INTRO.MARK_IN_END))
-          : 1;
-        const markGone = Number.isFinite(introT) && introT >= INTRO.HOLD_END;
-
-        /* Publish where the badge sits, in viewport px, so the DOM flyer can
-           start exactly where the canvas left off. */
-        const canvasBox = canvas.getBoundingClientRect();
-        setLogoAnchor(
-          Number.isFinite(introT)
-            ? {
-                x: canvasBox.left + sx(markX),
-                y: canvasBox.top + sy(barMidY),
-                height: markH * unit,
-              }
-            : null,
-        );
-
-        if (!markGone && markIn > 0) {
-          const slide = (1 - easeOutSmooth(markIn)) * 260;
-
-          ctx.save();
-          ctx.globalAlpha = clamp01(markIn * 1.6);
-          /* Path2D coordinates run y-down; translate to the mark's TOP edge and
-             scale into model units before filling. */
-          ctx.translate(sx(markX) + slide * unit * 0.1, sy(barMidY + markH / 2));
-          const ms = (markH * unit) / 68;
-          ctx.scale(ms, ms);
-          ctx.fillStyle = rgba(logoInk, 1);
-          ctx.fill(MARK_D, "evenodd");
-          ctx.fillStyle = rgba(logoPaper, 1);
-          ctx.fill(MARK_L);
-          ctx.restore();
-
-          /* Wordmark beside it, split in the logo's two tones, wiped on
-             left-to-right so it reads as being written onto the machine. */
-          if (wordIn > 0) {
-            const textX = markX + markW + 4;
-            ctx.font = `${8 * unit}px ui-monospace, "SFMono-Regular", monospace`;
-            const dripW = ctx.measureText("Drip").width / unit;
-            const fullW = ctx.measureText("DripLink").width / unit;
-
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(
-              sx(textX),
-              sy(barMidY + markH),
-              fullW * unit * wordIn,
-              markH * 2 * unit,
-            );
-            ctx.clip();
-            label("Drip", textX, barMidY, 8, logoPaper, 1);
-            label("Link", textX + dripW, barMidY, 8, logoInk, 1);
-            ctx.restore();
-          }
-        }
-      }
 
       /* ============================================================== BED */
       const plateY = M.bedY;
@@ -670,9 +614,6 @@ export function PrintCanvas({ className }: { className?: string }) {
       rect(-M.bedW / 2 + 10, plateY - 7, M.bedW - 20, 7, machine, 0.6, 0.16, 1);
 
       if (detail) {
-        /* [11] Magnetic PEI sheet branding, as on the reference machine */
-        label("DripLink", -13, plateY + 2.6, 5, machine, 0.5);
-
         /* [13] Bed springs + [12] levelling knobs at each corner */
         for (const s of [-1, 1]) {
           const kx = s * (M.bedW / 2 - 18);

@@ -107,12 +107,12 @@ export async function calculateMeshQuotes(
     return { success: false, error: quotesErr.message || "Failed to calculate quotes." };
   }
 
-  const cleanQuotes: VendorQuoteItem[] = (quotes || []).map((q: any) => ({
-    provider_id: q.provider_id,
-    business_name: q.business_name,
-    location: q.location,
+  const cleanQuotes: VendorQuoteItem[] = (quotes || []).map((q: Record<string, unknown>) => ({
+    provider_id: String(q.provider_id),
+    business_name: String(q.business_name),
+    location: (q.location as string | null) ?? null,
     price: Number(q.price),
-    material: q.material,
+    material: String(q.material),
   }));
 
   return {
