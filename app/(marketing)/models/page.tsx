@@ -1,50 +1,56 @@
 import { PackageSearch } from "lucide-react";
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { ListingCard } from "@/components/marketing/listing-card";
+import { MarketplaceModelCard } from "@/components/marketing/marketplace-model-card";
 import { ModelsFilters } from "@/components/marketing/models-filters";
+import { ModelsPagination } from "@/components/marketing/models-pagination";
 import { Section } from "@/components/marketing/section";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton, SkeletonGroup } from "@/components/ui/skeleton";
-import { getCategoryCounts, getPublicListings } from "@/lib/queries";
-import { isCategory, isListingSort } from "@/lib/marketplace";
+import { getMarketplaceCategoryCounts, getMarketplaceModels } from "@/driplink-web-backend";
 
 export const metadata: Metadata = {
-  title: "Models",
+  title: "Browse 3D Models",
   description:
-    "Browse models made by the DripLink community. Buy the file, or send it straight to print.",
+    "Explore community-crafted 3D models on DripLink. Claim free models into your library or send them straight to print.",
 };
 
-/* Published listings change whenever a seller hits Publish, and the browse
-   view is the first thing they check afterwards. Rendering it per request
-   keeps that immediate. */
 export const dynamic = "force-dynamic";
 
 const GRID = "grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
 
 async function Results({
   category,
+  license,
   search,
   sort,
+  page,
 }: {
   category?: string;
+  license?: string;
   search?: string;
-  sort?: string;
+  sort?: "newest" | "price_low" | "price_high";
+  page: number;
 }) {
-  const { data: listings } = await getPublicListings({
-    category: isCategory(category) ? category : undefined,
+  const { data } = await getMarketplaceModels({
+    category,
+    licenseType: license,
     search,
-    sort: isListingSort(sort) ? sort : undefined,
+    sort,
+    page,
+    pageSize: 12,
   });
 
-  if (listings.length === 0) {
+  const { models, total, totalPages } = data;
+
+  if (models.length === 0) {
     return (
       <EmptyState
         icon={PackageSearch}
         size="lg"
         message={
-          search || category
-            ? "No models match that yet."
+          search || category || license
+            ? "No models match your current filters."
             : "No models have been published yet. The first one could be yours."
         }
       />
@@ -52,10 +58,24 @@ async function Results({
   }
 
   return (
-    <div className={GRID}>
-      {listings.map((listing) => (
-        <ListingCard key={listing.id} listing={listing} />
-      ))}
+    <div className="flex flex-col gap-8">
+      <div className={GRID}>
+        {models.map((model) => (
+          <MarketplaceModelCard key={model.id} model={model} />
+        ))}
+      </div>
+
+      <ModelsPagination
+        currentPage={page}
+        totalPages={totalPages}
+        totalItems={total}
+        searchParams={{
+          category,
+          license,
+          q: search,
+          sort,
+        }}
+      />
     </div>
   );
 }
@@ -64,28 +84,42 @@ function ResultsSkeleton() {
   return (
     <SkeletonGroup label="Loading models" className={GRID}>
       {Array.from({ length: 8 }, (_, index) => (
-        <Skeleton key={index} className="aspect-4/3 w-full" />
+        <Skeleton key={index} className="aspect-4/3 w-full rounded-[var(--radius-card)]" />
       ))}
     </SkeletonGroup>
   );
 }
 
-export default async function ModelsPage({ searchParams }: PageProps<"/models">) {
+export default async function ModelsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const params = await searchParams;
   const category = typeof params.category === "string" ? params.category : undefined;
+  const license = typeof params.license === "string" ? params.license : undefined;
   const search = typeof params.q === "string" ? params.q : undefined;
-  const sort = typeof params.sort === "string" ? params.sort : undefined;
+  const sortParam = typeof params.sort === "string" ? params.sort : undefined;
+  const sort =
+    sortParam === "price_low" || sortParam === "price_high" || sortParam === "newest"
+      ? sortParam
+      : "newest";
 
-  const { data: counts } = await getCategoryCounts();
+  const pageParam = typeof params.page === "string" ? parseInt(params.page, 10) : 1;
+  const page = isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
+
+  const { data: counts } = await getMarketplaceCategoryCounts();
 
   return (
     <Section>
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-3">
-          <h1 className="font-display text-3xl font-semibold text-fg md:text-4xl">Models</h1>
+          <h1 className="font-display text-3xl font-semibold text-fg md:text-4xl">
+            3D Model Marketplace
+          </h1>
           <p className="max-w-2xl text-base text-muted">
-            Models published by the DripLink community. Buy the file to open and modify in LeaFF
-            OS, or send it straight to Mart and get the printed part.
+            Explore 3D models published by the community. Claim free models directly into your
+            library, modify them, or send them straight to print.
           </p>
         </div>
 
@@ -93,8 +127,17 @@ export default async function ModelsPage({ searchParams }: PageProps<"/models">)
           <ModelsFilters counts={counts} />
         </Suspense>
 
-        <Suspense key={`${category ?? ""}-${search ?? ""}-${sort ?? ""}`} fallback={<ResultsSkeleton />}>
-          <Results category={category} search={search} sort={sort} />
+        <Suspense
+          key={`${category ?? ""}-${license ?? ""}-${search ?? ""}-${sort}-${page}`}
+          fallback={<ResultsSkeleton />}
+        >
+          <Results
+            category={category}
+            license={license}
+            search={search}
+            sort={sort}
+            page={page}
+          />
         </Suspense>
       </div>
     </Section>

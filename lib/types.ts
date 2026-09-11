@@ -135,3 +135,42 @@ export type LibraryItem = {
     seller: { studio_name: string } | null;
   } | null;
 };
+
+export type MarketplaceLicenseType = "standard" | "cc" | "commercial";
+export type MarketplaceModelStatus = "draft" | "published";
+
+export type MarketplaceModel = {
+  id: string;
+  seller_user_id: string | null;
+  title: string;
+  description: string | null;
+  category: string | null;
+  license_type: MarketplaceLicenseType;
+  price: number;
+  preview_image_paths: string[];
+  file_path?: string;
+  status: MarketplaceModelStatus;
+  created_at: string;
+  seller_name?: string;
+  seller_avatar?: string | null;
+  seller?: {
+    id: string;
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
+};
+
+export type AcquiredModel = {
+  acquisition_id: string;
+  acquired_at: string;
+  license_type: MarketplaceLicenseType;
+  model_id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  price: number;
+  preview_image_paths: string[];
+  file_path: string;
+  seller_name: string;
+};
+

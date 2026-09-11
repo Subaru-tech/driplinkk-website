@@ -4,9 +4,12 @@ import { getSupabaseServerClient } from "@/driplink-web-backend/db/client";
 import { getUnifiedUser, isClerkConfigured, syncClerkProfile } from "@/driplink-web-backend/auth/clerk";
 import { LISTING_SORTS, type Category, type ListingSort } from "@/lib/marketplace";
 import type {
+  AcquiredModel,
   LedgerEntry,
   LibraryItem,
   Listing,
+  MarketplaceLicenseType,
+  MarketplaceModel,
   PublicListing,
   MartOrder,
   Model,
@@ -540,3 +543,398 @@ export async function getAdminMartOrders(statusFilter?: string): Promise<QueryRe
   return { data: (data as unknown as AdminMartOrder[]) ?? [], backendReady: true };
 }
 
+/* ----------------------------------------------------------- Models Marketplace */
+
+export type MarketplaceQueryResult = {
+  models: MarketplaceModel[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+export async function getMarketplaceModels(options: {
+  search?: string;
+  category?: string;
+  licenseType?: MarketplaceLicenseType | string;
+  sort?: "newest" | "price_low" | "price_high";
+  page?: number;
+  pageSize?: number;
+} = {}): Promise<QueryResult<MarketplaceQueryResult>> {
+  const supabase = await getSupabaseServerClient();
+  const page = Math.max(options.page ?? 1, 1);
+  const pageSize = options.pageSize ?? 12;
+
+  const fallbackEmpty: MarketplaceQueryResult = {
+    models: [],
+    total: 0,
+    page,
+    pageSize,
+    totalPages: 0,
+  };
+
+  if (!supabase) return empty(fallbackEmpty);
+
+  try {
+    // 1. Try high-performance Postgres RPC
+    const { data: rpcRows, error: rpcError } = await supabase.rpc("get_marketplace_models", {
+      p_search: options.search?.trim() || null,
+      p_category: options.category?.trim() || null,
+      p_license_type: options.licenseType?.trim() || null,
+      p_sort: options.sort ?? "newest",
+      p_page: page,
+      p_page_size: pageSize,
+    });
+
+    if (!rpcError && rpcRows) {
+      const total = Number(rpcRows[0]?.total_count ?? 0);
+      const models: MarketplaceModel[] = rpcRows.map((row: {
+        id: string;
+        seller_user_id: string | null;
+        title: string;
+        description: string | null;
+        category: string | null;
+        license_type: MarketplaceLicenseType;
+        price: string | number;
+        preview_image_paths: string[] | null;
+        status: "draft" | "published";
+        created_at: string;
+        seller_name: string;
+        seller_avatar: string | null;
+      }) => ({
+        id: row.id,
+        seller_user_id: row.seller_user_id,
+        title: row.title,
+        description: row.description,
+        category: row.category,
+        license_type: row.license_type,
+        price: Number(row.price || 0),
+        preview_image_paths: row.preview_image_paths ?? [],
+        status: row.status,
+        created_at: row.created_at,
+        seller_name: row.seller_name,
+        seller_avatar: row.seller_avatar,
+        seller: row.seller_user_id
+          ? {
+              id: row.seller_user_id,
+              full_name: row.seller_name,
+              avatar_url: row.seller_avatar,
+            }
+          : null,
+      }));
+
+      return {
+        data: {
+          models,
+          total,
+          page,
+          pageSize,
+          totalPages: Math.ceil(total / pageSize),
+        },
+        backendReady: true,
+      };
+    }
+
+    // 2. Direct query fallback
+    let query = supabase
+      .from("models")
+      .select(
+        "id, seller_user_id, title, description, category, license_type, price, preview_image_paths, status, created_at, seller:profiles!models_seller_user_id_fkey(id, full_name, avatar_url)",
+        { count: "exact" }
+      )
+      .eq("status", "published");
+
+    if (options.category) {
+      query = query.ilike("category", options.category);
+    }
+    if (options.licenseType) {
+      query = query.eq("license_type", options.licenseType);
+    }
+    if (options.search) {
+      const escaped = options.search.replace(/[%_]/g, (char) => `\\${char}`);
+      query = query.or(`title.ilike.%${escaped}%,description.ilike.%${escaped}%`);
+    }
+
+    if (options.sort === "price_low") {
+      query = query.order("price", { ascending: true });
+    } else if (options.sort === "price_high") {
+      query = query.order("price", { ascending: false });
+    } else {
+      query = query.order("created_at", { ascending: false });
+    }
+
+    const from = (page - 1) * pageSize;
+    query = query.range(from, from + pageSize - 1);
+
+    const { data, count, error } = await query;
+    if (error) {
+      console.error("getMarketplaceModels fallback error:", error);
+      return empty(fallbackEmpty);
+    }
+
+    const total = count ?? 0;
+    const models: MarketplaceModel[] = ((data as unknown as Array<Record<string, unknown>>) ?? []).map((row) => {
+      const sellerProfile = row.seller as { id: string; full_name: string | null; avatar_url: string | null } | null;
+      return {
+        id: String(row.id),
+        seller_user_id: (row.seller_user_id as string) ?? null,
+        title: String(row.title),
+        description: (row.description as string) ?? null,
+        category: (row.category as string) ?? null,
+        license_type: (row.license_type as MarketplaceLicenseType) ?? "standard",
+        price: Number(row.price || 0),
+        preview_image_paths: (row.preview_image_paths as string[]) ?? [],
+        status: (row.status as "draft" | "published") ?? "published",
+        created_at: String(row.created_at),
+        seller_name: sellerProfile?.full_name ?? "DripLink Creator",
+        seller_avatar: sellerProfile?.avatar_url ?? null,
+        seller: sellerProfile,
+      };
+    });
+
+    return {
+      data: {
+        models,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+      },
+      backendReady: true,
+    };
+  } catch (err) {
+    console.error("getMarketplaceModels error:", err);
+    return empty(fallbackEmpty);
+  }
+}
+
+export async function getMarketplaceModelById(
+  modelId: string
+): Promise<QueryResult<MarketplaceModel | null>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty(null);
+
+  try {
+    const { data: rpcRows, error: rpcError } = await supabase.rpc(
+      "get_marketplace_model_by_id",
+      { p_model_id: modelId }
+    );
+
+    if (!rpcError && rpcRows && rpcRows.length > 0) {
+      const row = rpcRows[0];
+      const model: MarketplaceModel = {
+        id: row.id,
+        seller_user_id: row.seller_user_id,
+        title: row.title,
+        description: row.description,
+        category: row.category,
+        license_type: row.license_type,
+        price: Number(row.price || 0),
+        preview_image_paths: row.preview_image_paths ?? [],
+        file_path: row.file_path,
+        status: row.status,
+        created_at: row.created_at,
+        seller_name: row.seller_name,
+        seller_avatar: row.seller_avatar,
+        seller: row.seller_user_id
+          ? {
+              id: row.seller_user_id,
+              full_name: row.seller_name,
+              avatar_url: row.seller_avatar,
+            }
+          : null,
+      };
+      return { data: model, backendReady: true };
+    }
+
+    const { data, error } = await supabase
+      .from("models")
+      .select(
+        "id, seller_user_id, title, description, category, license_type, price, preview_image_paths, file_path, status, created_at, seller:profiles!models_seller_user_id_fkey(id, full_name, avatar_url)"
+      )
+      .eq("id", modelId)
+      .eq("status", "published")
+      .maybeSingle();
+
+    if (error || !data) return empty(null);
+
+    const sellerProfile = (Array.isArray(data.seller) ? data.seller[0] : data.seller) as unknown as {
+      id: string;
+      full_name: string | null;
+      avatar_url: string | null;
+    } | null;
+    const model: MarketplaceModel = {
+      id: data.id,
+      seller_user_id: data.seller_user_id,
+      title: data.title,
+      description: data.description,
+      category: data.category,
+      license_type: data.license_type,
+      price: Number(data.price || 0),
+      preview_image_paths: data.preview_image_paths ?? [],
+      file_path: data.file_path,
+      status: data.status,
+      created_at: data.created_at,
+      seller_name: sellerProfile?.full_name ?? "DripLink Creator",
+      seller_avatar: sellerProfile?.avatar_url ?? null,
+      seller: sellerProfile,
+    };
+
+    return { data: model, backendReady: true };
+  } catch (err) {
+    console.error("getMarketplaceModelById error:", err);
+    return empty(null);
+  }
+}
+
+export async function isModelAcquired(
+  modelId: string,
+  userId?: string
+): Promise<boolean> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return false;
+
+  let targetUserId = userId;
+  if (!targetUserId) {
+    const user = await getUnifiedUser();
+    if (!user) return false;
+    targetUserId = user.id;
+  }
+
+  const { data } = await supabase
+    .from("model_acquisitions")
+    .select("id")
+    .eq("user_id", targetUserId)
+    .eq("model_id", modelId)
+    .maybeSingle();
+
+  return Boolean(data);
+}
+
+export async function getUserAcquiredModels(
+  userId?: string
+): Promise<QueryResult<AcquiredModel[]>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty([]);
+
+  let targetUserId = userId;
+  if (!targetUserId) {
+    const user = await getUnifiedUser();
+    if (!user) return empty([]);
+    targetUserId = user.id;
+  }
+
+  try {
+    const { data: rpcRows, error: rpcError } = await supabase.rpc(
+      "get_user_model_acquisitions",
+      { p_user_id: targetUserId }
+    );
+
+    if (!rpcError && rpcRows) {
+      const models: AcquiredModel[] = rpcRows.map((row: {
+        acquisition_id: string;
+        acquired_at: string;
+        license_type: MarketplaceLicenseType;
+        model_id: string;
+        title: string;
+        description: string | null;
+        category: string | null;
+        price: string | number;
+        preview_image_paths: string[] | null;
+        file_path: string;
+        seller_name: string;
+      }) => ({
+        acquisition_id: row.acquisition_id,
+        acquired_at: row.acquired_at,
+        license_type: row.license_type,
+        model_id: row.model_id,
+        title: row.title,
+        description: row.description,
+        category: row.category,
+        price: Number(row.price || 0),
+        preview_image_paths: row.preview_image_paths ?? [],
+        file_path: row.file_path,
+        seller_name: row.seller_name,
+      }));
+
+      return { data: models, backendReady: true };
+    }
+
+    const { data, error } = await supabase
+      .from("model_acquisitions")
+      .select(`
+        id,
+        acquired_at,
+        license_type,
+        model:models(
+          id,
+          title,
+          description,
+          category,
+          price,
+          preview_image_paths,
+          file_path,
+          seller:profiles!models_seller_user_id_fkey(full_name)
+        )
+      `)
+      .eq("user_id", targetUserId)
+      .order("acquired_at", { ascending: false });
+
+    if (error || !data) return empty([]);
+
+    const acquired: AcquiredModel[] = (data as unknown as Array<{
+      id: string;
+      acquired_at: string;
+      license_type: MarketplaceLicenseType;
+      model: {
+        id: string;
+        title: string;
+        description: string | null;
+        category: string | null;
+        price: number;
+        preview_image_paths: string[];
+        file_path: string;
+        seller: { full_name: string | null } | null;
+      };
+    }>).map((item) => ({
+      acquisition_id: item.id,
+      acquired_at: item.acquired_at,
+      license_type: item.license_type,
+      model_id: item.model.id,
+      title: item.model.title,
+      description: item.model.description,
+      category: item.model.category,
+      price: Number(item.model.price || 0),
+      preview_image_paths: item.model.preview_image_paths ?? [],
+      file_path: item.model.file_path,
+      seller_name: item.model.seller?.full_name ?? "DripLink Creator",
+    }));
+
+    return { data: acquired, backendReady: true };
+  } catch (err) {
+    console.error("getUserAcquiredModels error:", err);
+    return empty([]);
+  }
+}
+
+export async function getMarketplaceCategoryCounts(): Promise<
+  QueryResult<Record<string, number>>
+> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty({});
+
+  const { data, error } = await supabase
+    .from("models")
+    .select("category")
+    .eq("status", "published");
+
+  if (error || !data) return empty({});
+
+  const counts: Record<string, number> = {};
+  for (const row of data as { category: string | null }[]) {
+    if (row.category) {
+      counts[row.category] = (counts[row.category] ?? 0) + 1;
+    }
+  }
+  return { data: counts, backendReady: true };
+}

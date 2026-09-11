@@ -65,6 +65,35 @@ export function isLicense(value: string | undefined): value is License {
   return Boolean(value && value in LICENSES);
 }
 
+export const MODEL_LICENSES = {
+  standard: {
+    label: "Standard License",
+    badge: "Standard",
+    summary: "Personal non-commercial 3D printing and private modification.",
+  },
+  cc: {
+    label: "Creative Commons (CC-BY)",
+    badge: "Creative Commons",
+    summary: "Free to print, remix, and share with attribution.",
+  },
+  commercial: {
+    label: "Commercial License",
+    badge: "Commercial",
+    summary: "Permits printing and selling finished physical prints commercially.",
+  },
+} as const;
+
+export type ModelLicenseType = keyof typeof MODEL_LICENSES;
+
+export const MODEL_LICENSE_LIST = Object.entries(MODEL_LICENSES).map(([id, value]) => ({
+  id: id as ModelLicenseType,
+  ...value,
+}));
+
+export function isModelLicense(value: string | undefined): value is ModelLicenseType {
+  return Boolean(value && value in MODEL_LICENSES);
+}
+
 /** Sort options on the browse page. */
 export const LISTING_SORTS = {
   newest: { label: "Newest", column: "published_at", ascending: false },

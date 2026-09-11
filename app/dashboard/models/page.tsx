@@ -2,14 +2,14 @@ import { Box, LibraryBig, SearchX } from "lucide-react";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { BackendNotice } from "@/components/dashboard/backend-notice";
-import { LibraryCard } from "@/components/dashboard/library-card";
+import { AcquiredModelCard } from "@/components/dashboard/acquired-model-card";
 import { ModelCard, ModelCardSkeleton } from "@/components/dashboard/model-card";
 import { ModelsToolbar } from "@/components/dashboard/models-toolbar";
 import { UploadModelButton } from "@/components/dashboard/upload-model-button";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton, SkeletonGroup } from "@/components/ui/skeleton";
-import { getLibrary, getModels, MODEL_SORTS, type ModelSort } from "@/lib/queries";
+import { getModels, getUserAcquiredModels, MODEL_SORTS, type ModelSort } from "@/driplink-web-backend";
 import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = { title: "My Models" };
@@ -121,9 +121,9 @@ function ModelGridSkeleton() {
 /* -------------------------------------------------------------- acquired */
 
 async function LibraryGrid() {
-  const { data: items, backendReady } = await getLibrary();
+  const { data: models, backendReady } = await getUserAcquiredModels();
 
-  if (items.length === 0) {
+  if (models.length === 0) {
     return (
       <>
         {backendReady ? null : <BackendNotice />}
@@ -139,8 +139,8 @@ async function LibraryGrid() {
 
   return (
     <div className={GRID}>
-      {items.map((item) => (
-        <LibraryCard key={item.id} item={item} />
+      {models.map((item) => (
+        <AcquiredModelCard key={item.acquisition_id} model={item} />
       ))}
     </div>
   );

@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  /* Allow LAN and localhost origins in development for assets/HMR/scripts */
+  allowedDevOrigins: [
+    "192.168.0.203",
+    "192.168.*.*",
+    "10.*.*.*",
+    "localhost",
+  ],
+
   /* Suppress the "X-Powered-By: Next.js" header — no reason to advertise the
      framework to scanners. */
   poweredByHeader: false,
@@ -8,10 +16,34 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
-        /* My Library was merged into the Acquired tab of My Models.
-           Permanent so the old URL is not served again after the first visit. */
-        source: "/dashboard/library",
-        destination: "/dashboard/models?tab=acquired",
+        /* App merged into Download page (surfacing both LeaFF OS desktop and mobile companion). */
+        source: "/app",
+        destination: "/download",
+        permanent: true,
+      },
+      {
+        source: "/partner-with-us",
+        destination: "/partner",
+        permanent: true,
+      },
+      {
+        source: "/partners",
+        destination: "/partner",
+        permanent: true,
+      },
+      {
+        source: "/quote",
+        destination: "/mart",
+        permanent: true,
+      },
+      {
+        source: "/get-a-quote",
+        destination: "/mart",
+        permanent: true,
+      },
+      {
+        source: "/print-quotes",
+        destination: "/mart",
         permanent: true,
       },
     ];

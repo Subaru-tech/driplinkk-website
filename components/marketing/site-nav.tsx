@@ -8,6 +8,7 @@ import { Show, UserButton } from "@clerk/nextjs";
 import { ButtonLink } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Wordmark } from "@/components/marketing/wordmark";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { cn } from "@/lib/cn";
 
 const isClerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
@@ -19,15 +20,35 @@ const isClerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 const links = [
   { href: "/leaff-os", label: "LeaFF OS" },
   { href: "/models", label: "Models" },
-  { href: "/mart", label: "Mart" },
-  { href: "/app", label: "App" },
+  { href: "/mart", label: "Get a Quote" },
+  { href: "/freelance", label: "Freelance" },
+  { href: "/download", label: "Download" },
   { href: "/about", label: "About" },
 ];
 
 export function SiteNav() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [supabaseAuthed, setSupabaseAuthed] = useState(false);
   const pathname = usePathname();
+
+  useEffect(() => {
+    if (isClerkEnabled) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSupabaseAuthed(Boolean(session?.user));
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSupabaseAuthed(Boolean(session?.user));
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -91,7 +112,7 @@ export function SiteNav() {
           })}
         </ul>
 
-        <div className="hidden items-center gap-2 md:flex">
+        <div className="hidden items-center gap-3 md:flex">
           <ThemeToggle />
           {isClerkEnabled ? (
             <>
@@ -104,9 +125,16 @@ export function SiteNav() {
                 </ButtonLink>
               </Show>
               <Show when="signed-in">
+                <ButtonLink href="/dashboard" variant="secondary" size="sm">
+                  Dashboard
+                </ButtonLink>
                 <UserButton />
               </Show>
             </>
+          ) : supabaseAuthed ? (
+            <ButtonLink href="/dashboard" variant="secondary" size="sm">
+              Dashboard
+            </ButtonLink>
           ) : (
             <>
               <ButtonLink href="/login" variant="ghost" size="sm">
@@ -123,8 +151,15 @@ export function SiteNav() {
           <ThemeToggle />
           {isClerkEnabled ? (
             <Show when="signed-in">
+              <ButtonLink href="/dashboard" variant="secondary" size="sm" className="h-8 px-2.5 text-xs">
+                Dashboard
+              </ButtonLink>
               <UserButton />
             </Show>
+          ) : supabaseAuthed ? (
+            <ButtonLink href="/dashboard" variant="secondary" size="sm" className="h-8 px-2.5 text-xs">
+              Dashboard
+            </ButtonLink>
           ) : null}
           <button
             type="button"
@@ -193,11 +228,31 @@ export function SiteNav() {
                   </ButtonLink>
                 </Show>
                 <Show when="signed-in">
-                  <div className="flex items-center justify-end rounded-[var(--radius-card)] border border-line bg-surface p-3">
+                  <ButtonLink
+                    href="/dashboard"
+                    variant="primary"
+                    size="lg"
+                    className="w-full"
+                    onClick={closeMenu}
+                  >
+                    Go to Dashboard
+                  </ButtonLink>
+                  <div className="flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-surface p-3">
+                    <span className="text-sm font-medium text-fg">Account</span>
                     <UserButton />
                   </div>
                 </Show>
               </>
+            ) : supabaseAuthed ? (
+              <ButtonLink
+                href="/dashboard"
+                variant="primary"
+                size="lg"
+                className="w-full"
+                onClick={closeMenu}
+              >
+                Go to Dashboard
+              </ButtonLink>
             ) : (
               <>
                 <ButtonLink

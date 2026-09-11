@@ -2,6 +2,7 @@ import {
   Boxes,
   CreditCard,
   LayoutDashboard,
+  LibraryBig,
   Package,
   ReceiptIndianRupee,
   Store,
@@ -11,9 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-/** Spec §5 — Overview / My Models / Mart Orders / Billing / Account.
-    My Library was merged into My Models (Created/Acquired tabs) in the
-    simplification pass. Five items is the mobile tab bar ceiling at 320px. */
+/** Spec §5 — Overview / My Models / My Library / Mart Orders / Billing / Account. */
 export type NavItem = {
   href: string;
   label: string;
@@ -24,6 +23,7 @@ export type NavItem = {
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Overview", shortLabel: "Home", icon: LayoutDashboard },
+  { href: "/dashboard/library", label: "My Library", shortLabel: "Library", icon: LibraryBig },
   { href: "/dashboard/models", label: "My Models", shortLabel: "Models", icon: Boxes },
   { href: "/dashboard/mart-orders", label: "Mart Orders", shortLabel: "Orders", icon: Truck },
   { href: "/dashboard/billing", label: "Credits & Billing", shortLabel: "Billing", icon: CreditCard },

@@ -61,9 +61,15 @@ export default function LeaffOsPage() {
         headline="The workspace between an idea and a printable part."
         subhead="Generate real geometry from a description, then refine it with tools that understand how the thing actually gets made."
         actions={
-          <ButtonLink href="/signup" size="lg">
-            Join Waitlist
-          </ButtonLink>
+          <>
+            <ButtonLink href="/download" size="lg">
+              <Download className="size-4" aria-hidden="true" />
+              Download LeaFF OS
+            </ButtonLink>
+            <ButtonLink href="/signup" size="lg" variant="secondary">
+              Join Waitlist
+            </ButtonLink>
+          </>
         }
       />
 

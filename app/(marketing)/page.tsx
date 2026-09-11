@@ -1,4 +1,4 @@
-import { Boxes, Layers, Printer, Smartphone, SlidersHorizontal, Sparkles } from "lucide-react";
+import { Boxes, Download, Layers, Printer, SlidersHorizontal, Sparkles } from "lucide-react";
 import { CinematicHero } from "@/components/marketing/cinematic-hero";
 import { CtaBand } from "@/components/marketing/cta-band";
 import { HowItWorks } from "@/components/marketing/how-it-works";
@@ -35,20 +35,19 @@ const pillars = [
   },
   {
     icon: Boxes,
-    kicker: "Network",
-    title: "Mart",
+    kicker: "Multi-Vendor Network",
+    title: "Instant Print Quotes",
     description:
-      "Send any finished model straight to a print. Vetted printers, one price, tracked to your door.",
+      "Upload any CAD model to compare vetted print shop prices. One guaranteed rate, tracked to your door.",
     href: "/mart",
   },
   {
-    icon: Smartphone,
-    kicker: "Mobile",
-    title: "App",
+    icon: Download,
+    kicker: "Ecosystem",
+    title: "Download",
     description:
-      "Check on prints, top up credits and browse your models from your phone.",
-    href: "/app",
-    badge: "Coming soon",
+      "Get LeaFF OS for desktop and the DripLink companion app for iOS and Android.",
+    href: "/download",
   },
 ];
 

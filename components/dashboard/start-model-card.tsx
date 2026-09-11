@@ -25,7 +25,7 @@ export function StartModelCard() {
           <ExternalLink className="size-4" aria-hidden="true" />
           Open in App
         </ButtonLink>
-        <ButtonLink href="/leaff-os" variant="secondary">
+        <ButtonLink href="/download" variant="secondary">
           <Download className="size-4" aria-hidden="true" />
           Download
         </ButtonLink>

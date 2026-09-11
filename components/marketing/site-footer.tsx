@@ -9,8 +9,10 @@ const columns = [
     heading: "Product",
     links: [
       { href: "/leaff-os", label: "LeaFF OS" },
-      { href: "/mart", label: "Mart" },
-      { href: "/app", label: "App" },
+      { href: "/models", label: "Models" },
+      { href: "/mart", label: "Get a Quote (Mart)" },
+      { href: "/freelance", label: "Freelance" },
+      { href: "/download", label: "Download" },
     ],
   },
   {
@@ -18,6 +20,7 @@ const columns = [
     links: [
       { href: "/about", label: "About" },
       { href: "/contact", label: "Contact" },
+      { href: "/partner", label: "Partner With Us" },
     ],
   },
   {

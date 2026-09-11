@@ -1,3 +1,4 @@
+import { Printer } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { PrintCanvas } from "@/components/marketing/print-canvas";
 
@@ -53,11 +54,15 @@ export function CinematicHero() {
             send it to a printer — without ever switching tools.
           </p>
 
-          <div className="hero-pull mt-6 sm:mt-10 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+          <div className="hero-pull mt-6 sm:mt-10 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <ButtonLink href="/sign-up" size="lg">
               Sign Up
             </ButtonLink>
-            <ButtonLink href="#problem" variant="secondary" size="lg">
+            <ButtonLink href="/mart" variant="secondary" size="lg">
+              <Printer className="size-4" aria-hidden="true" />
+              Get a Print Quote
+            </ButtonLink>
+            <ButtonLink href="#problem" variant="ghost" size="lg">
               See how it works
             </ButtonLink>
           </div>

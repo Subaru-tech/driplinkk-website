@@ -6,10 +6,12 @@ import { Hero } from "@/components/marketing/hero";
 import { Reveal } from "@/components/marketing/reveal";
 import { Section, SectionHeading } from "@/components/marketing/section";
 import { ButtonLink } from "@/components/ui/button";
+import { MartQuoteCalculator } from "@/components/marketing/mart-quote-calculator";
 
 export const metadata: Metadata = {
-  title: "Mart",
-  description: "Send any finished model to a vetted printer. One price, tracked to your door.",
+  title: "Get a Print Quote — Instant Multi-Vendor 3D Printing | DripLink Mart",
+  description:
+    "Instant multi-vendor print price comparison for any 3D model. Upload your STL, STEP, or 3MF file to get guaranteed upfront pricing from vetted print hubs, tracked to your door.",
 };
 
 const features = [
@@ -48,17 +50,27 @@ export default function MartPage() {
       <Hero
         eyebrow={
           <span className="rounded-full bg-accent-muted px-3 py-1 text-xs font-medium text-accent">
-            Mart
+            DripLink Mart • Multi-Vendor Print Network
           </span>
         }
-        headline="Get it printed without finding a printer."
-        subhead="Send a finished model to a vetted print shop, at a quoted price, tracked from confirmation to delivery."
+        headline="Instant multi-vendor print quotes for any 3D model."
+        subhead="Upload your 3D CAD or mesh file to compare guaranteed pricing from vetted regional print farms. One transparent price, verified ±0.05 mm tolerances, and tracked delivery to your door."
         actions={
-          <ButtonLink href="/signup" size="lg">
-            Join Waitlist
-          </ButtonLink>
+          <>
+            <ButtonLink href="#quote-estimator" size="lg">
+              <Upload className="size-4" aria-hidden="true" />
+              Upload for Instant Quote
+            </ButtonLink>
+            <ButtonLink href="/signup" size="lg" variant="secondary">
+              Join Waitlist
+            </ButtonLink>
+          </>
         }
       />
+
+      <Section tone="canvas" className="pt-0">
+        <MartQuoteCalculator />
+      </Section>
 
       <Section tone="surface">
         <SectionHeading eyebrow="Why Mart" title="The part of printing nobody wants to manage." />
