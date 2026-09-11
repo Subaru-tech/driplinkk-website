@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Layers, Search, X } from "lucide-react";
+import { Box, Layers, Plus, Search, X } from "lucide-react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { cn } from "@/lib/cn";
@@ -79,17 +80,30 @@ export function ModelsHeader({
       <div className="relative overflow-hidden rounded-2xl border border-line bg-gradient-to-b from-surface to-canvas p-6 sm:p-8">
         <div className="absolute top-0 right-0 -mr-16 -mt-16 size-72 rounded-full bg-accent/5 blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col gap-4 max-w-3xl">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent-muted px-3 py-1 text-xs font-semibold text-accent">
-              <Box className="size-3.5" aria-hidden="true" />
-              CAD & 3D Assets
-            </span>
-            <span className="text-xs text-muted">Ready for 3D Printing & LeaFF OS</span>
-          </div>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent-muted px-3 py-1 text-xs font-semibold text-accent">
+                  <Box className="size-3.5" aria-hidden="true" />
+                  CAD & 3D Assets
+                </span>
+                <span className="text-xs text-muted">Ready for 3D Printing & LeaFF OS</span>
+              </div>
 
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-fg sm:text-4xl md:text-5xl">
-            3D Model Marketplace
-          </h1>
+              <h1 className="font-display text-3xl font-semibold tracking-tight text-fg sm:text-4xl md:text-5xl">
+                3D Model Marketplace
+              </h1>
+            </div>
+
+            <Link
+              href="/dashboard/models/upload"
+              id="header-upload-model-btn"
+              className="inline-flex items-center gap-2 self-start shrink-0 rounded-xl bg-accent px-4 py-2.5 text-xs font-bold text-accent-contrast shadow-sm hover:bg-accent-hover active:scale-95 transition-all cursor-pointer"
+            >
+              <Plus className="size-4" />
+              <span>Upload Model</span>
+            </Link>
+          </div>
 
           <p className="text-sm text-muted sm:text-base leading-relaxed max-w-2xl">
             Discover, download, customize, and build from a growing community library of engineering

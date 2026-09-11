@@ -86,6 +86,71 @@ export async function recordUploadedModel({
   return { data };
 }
 
+export type CreatorModelInput = {
+  title: string;
+  description: string;
+  category: string;
+  subcategory?: string;
+  tags?: string[];
+  price: number;
+  licenseType: string;
+  dimensions?: { x?: number; y?: number; z?: number };
+  materials?: string[];
+  printInfo?: {
+    layerHeight?: string;
+    infill?: string;
+    supports?: string;
+    printTime?: string;
+    assemblyNotes?: string;
+  };
+  filePath?: string;
+  previewImagePaths?: string[];
+  thumbnailUrl?: string | null;
+  status?: "published" | "under_review" | "draft" | "rejected";
+};
+
+export async function publishCreatorModelListing(
+  input: CreatorModelInput
+): Promise<{ success: boolean; data?: { id: string }; error?: string }> {
+  const user = await getUnifiedUser();
+  if (!user) {
+    return { success: false, error: "You must be signed in to publish a model." };
+  }
+
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) {
+    return { success: false, error: "Backend database is not connected." };
+  }
+
+  const { data, error } = await supabase
+    .from("models")
+    .insert({
+      owner_id: user.id,
+      seller_user_id: user.id,
+      name: input.title,
+      title: input.title,
+      description: input.description,
+      category: input.category,
+      license_type: input.licenseType || "standard",
+      price: Number(input.price || 0),
+      preview_image_paths: input.previewImagePaths ?? [],
+      thumbnail_url: input.thumbnailUrl || (input.previewImagePaths?.[0] ?? null),
+      storage_path: input.filePath || "models/placeholder.stl",
+      file_path: input.filePath || "models/placeholder.stl",
+      status: input.status || "published",
+      credits_spent: 0,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    console.error("Failed to publish creator model:", error);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true, data: { id: data.id } };
+}
+
 /**
  * Updates an existing model's thumbnail URL.
  */
