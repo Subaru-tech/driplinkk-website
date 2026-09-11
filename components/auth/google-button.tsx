@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useSignIn, useSignUp } from "@clerk/nextjs";
+import { useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
@@ -50,8 +50,9 @@ function ClerkGoogleButton({
   text = "Continue with Google",
   disabled = false,
 }: GoogleButtonProps) {
-  const { signIn, fetchStatus: signInStatus } = useSignIn();
-  const { signUp, fetchStatus: signUpStatus } = useSignUp();
+  const clerk = useClerk();
+  const { signInStatus } = useSignIn() as { signInStatus?: string };
+  const { signUpStatus } = useSignUp() as { signUpStatus?: string };
   const [submitting, setSubmitting] = useState(false);
 
   async function handleGoogleAuth() {
@@ -63,40 +64,33 @@ function ClerkGoogleButton({
     const redirectUrl = redirectParam && redirectParam.startsWith("/") ? redirectParam : "/dashboard";
 
     try {
-      if (isSignUp && signUp) {
-        const { error } = await signUp.sso({
+      const client = clerk.client;
+      if (isSignUp && client?.signUp) {
+        await (client.signUp as unknown as {
+          authenticateWithRedirect: (params: {
+            strategy: string;
+            redirectUrl: string;
+            redirectUrlComplete: string;
+          }) => Promise<void>;
+        }).authenticateWithRedirect({
           strategy: "oauth_google",
-          redirectUrl,
-          redirectCallbackUrl: "/sso-callback",
+          redirectUrl: "/sso-callback",
+          redirectUrlComplete: redirectUrl,
         });
-        if (error) {
-          const { error: signInErr } = await signIn.sso({
-            strategy: "oauth_google",
-            redirectUrl,
-            redirectCallbackUrl: "/sso-callback",
-          });
-          if (signInErr) {
-            setSubmitting(false);
-            onError(signInErr.message || error.message || "Failed to authenticate with Google.");
-          }
-        }
-      } else if (signIn) {
-        const { error } = await signIn.sso({
+      } else if (client?.signIn) {
+        await (client.signIn as unknown as {
+          authenticateWithRedirect: (params: {
+            strategy: string;
+            redirectUrl: string;
+            redirectUrlComplete: string;
+          }) => Promise<void>;
+        }).authenticateWithRedirect({
           strategy: "oauth_google",
-          redirectUrl,
-          redirectCallbackUrl: "/sso-callback",
+          redirectUrl: "/sso-callback",
+          redirectUrlComplete: redirectUrl,
         });
-        if (error) {
-          const { error: signUpErr } = await signUp.sso({
-            strategy: "oauth_google",
-            redirectUrl,
-            redirectCallbackUrl: "/sso-callback",
-          });
-          if (signUpErr) {
-            setSubmitting(false);
-            onError(signUpErr.message || error.message || "Failed to authenticate with Google.");
-          }
-        }
+      } else {
+        throw new Error("Authentication client is not ready.");
       }
     } catch (err: unknown) {
       setSubmitting(false);
