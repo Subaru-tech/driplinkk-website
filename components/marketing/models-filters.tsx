@@ -1,35 +1,46 @@
 "use client";
 
-import { Filter, Search } from "lucide-react";
+import { Filter, RotateCcw, SlidersHorizontal, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
-import { Input, Select } from "@/components/ui/input";
-import { CATEGORY_LIST, MODEL_LICENSE_LIST } from "@/lib/marketplace";
+import { useTransition } from "react";
 import { cn } from "@/lib/cn";
+import {
+  CATEGORY_LIST,
+  MODEL_FORMATS,
+  MODEL_LICENSE_LIST,
+  PRINT_MATERIALS,
+} from "@/lib/marketplace";
 
 export const MODEL_SORTS = {
-  newest: { label: "Newest first" },
+  newest: { label: "Newest arrivals" },
   price_low: { label: "Price: low to high" },
   price_high: { label: "Price: high to low" },
 } as const;
 
-export function ModelsFilters({ counts }: { counts: Record<string, number> }) {
+export function MarketplaceTopBar({
+  total = 0,
+  onOpenMobileFilters,
+}: {
+  total: number;
+  onOpenMobileFilters?: () => void;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
 
-  const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const category = searchParams.get("category") ?? "";
   const license = searchParams.get("license") ?? "";
+  const priceFilter = searchParams.get("price") ?? "";
+  const format = searchParams.get("format") ?? "";
+  const material = searchParams.get("material") ?? "";
   const sort = searchParams.get("sort") ?? "newest";
 
-  function apply(next: Record<string, string>) {
+  const activeCount = [category, license, priceFilter, format, material].filter(Boolean).length;
+
+  function apply(next: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
-    // Reset to page 1 on filter change
-    if (!("page" in next)) {
-      params.delete("page");
-    }
+    params.delete("page");
     for (const [key, value] of Object.entries(next)) {
       if (value) params.set(key, value);
       else params.delete(key);
@@ -37,114 +48,337 @@ export function ModelsFilters({ counts }: { counts: Record<string, number> }) {
     startTransition(() => router.replace(`${pathname}?${params.toString()}`, { scroll: false }));
   }
 
-  useEffect(() => {
-    const current = searchParams.get("q") ?? "";
-    if (search === current) return;
-    const timer = setTimeout(() => apply({ q: search }), 300);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
+  function clearAll() {
+    const params = new URLSearchParams();
+    const q = searchParams.get("q");
+    if (q) params.set("q", q);
+    startTransition(() => router.replace(`${pathname}?${params.toString()}`, { scroll: false }));
+  }
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
-          <Search
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted"
-            aria-hidden="true"
-          />
-          <Input
-            id="models-search-input"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search models by title or description..."
-            aria-label="Search models"
-            className="pl-9"
-          />
+    <div className="flex flex-col gap-3 pb-2 border-b border-line/60">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <h2 className="font-display text-xl font-semibold text-fg">
+            {category || "All Models"}
+          </h2>
+          <span className="rounded-full bg-raised px-2.5 py-0.5 font-mono text-xs text-muted border border-line">
+            {total} {total === 1 ? "model" : "models"}
+          </span>
         </div>
 
-        <Select
-          id="models-sort-select"
-          value={sort}
-          onChange={(event) => apply({ sort: event.target.value })}
-          aria-label="Sort models"
-          className="sm:w-56"
-        >
-          {Object.entries(MODEL_SORTS).map(([value, option]) => (
-            <option key={value} value={value}>
-              {option.label}
-            </option>
-          ))}
-        </Select>
-      </div>
+        <div className="flex items-center gap-2.5">
+          {/* Mobile filter button */}
+          {onOpenMobileFilters && (
+            <button
+              type="button"
+              onClick={onOpenMobileFilters}
+              className="flex lg:hidden items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-fg hover:bg-raised"
+            >
+              <SlidersHorizontal className="size-3.5 text-accent" />
+              <span>Filters</span>
+              {activeCount > 0 && (
+                <span className="rounded-full bg-accent px-1.5 py-0.2 text-[10px] text-accent-contrast font-bold">
+                  {activeCount}
+                </span>
+              )}
+            </button>
+          )}
 
-      <div className="flex flex-col gap-3">
-        {/* Category Filter Chips */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-muted mr-1">Category:</span>
-          <FilterChip
-            label="All Categories"
-            active={!category}
-            onClick={() => apply({ category: "" })}
-          />
-          {CATEGORY_LIST.map((option) => (
-            <FilterChip
-              key={option.id}
-              label={option.label}
-              count={counts[option.label] ?? counts[option.id]}
-              active={category.toLowerCase() === option.label.toLowerCase() || category === option.id}
-              onClick={() => apply({ category: option.label })}
-            />
-          ))}
-        </div>
-
-        {/* License Filter Chips */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-muted mr-1">License:</span>
-          <FilterChip
-            label="All Licenses"
-            active={!license}
-            onClick={() => apply({ license: "" })}
-          />
-          {MODEL_LICENSE_LIST.map((lic) => (
-            <FilterChip
-              key={lic.id}
-              label={lic.badge}
-              active={license === lic.id}
-              onClick={() => apply({ license: lic.id })}
-            />
-          ))}
+          {/* Sort Dropdown */}
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-muted hidden sm:inline">Sort:</span>
+            <select
+              id="models-sort-dropdown"
+              value={sort}
+              onChange={(e) => apply({ sort: e.target.value })}
+              className="h-8 rounded-lg border border-line bg-surface px-2.5 text-xs font-medium text-fg hover:border-line-strong focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer"
+            >
+              {Object.entries(MODEL_SORTS).map(([key, opt]) => (
+                <option key={key} value={key}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
+
+      {/* Active Filter Badges */}
+      {activeCount > 0 && (
+        <div className="flex items-center gap-2 flex-wrap text-xs pt-1">
+          <span className="text-muted text-[11px]">Active filters:</span>
+          {category && (
+            <FilterTag label={`Category: ${category}`} onRemove={() => apply({ category: null })} />
+          )}
+          {license && (
+            <FilterTag label={`License: ${license}`} onRemove={() => apply({ license: null })} />
+          )}
+          {priceFilter && (
+            <FilterTag label={`Price: ${priceFilter}`} onRemove={() => apply({ price: null })} />
+          )}
+          {format && (
+            <FilterTag label={`Format: ${format}`} onRemove={() => apply({ format: null })} />
+          )}
+          {material && (
+            <FilterTag label={`Material: ${material}`} onRemove={() => apply({ material: null })} />
+          )}
+          <button
+            type="button"
+            onClick={clearAll}
+            className="flex items-center gap-1 text-[11px] text-accent hover:underline font-medium ml-1"
+          >
+            <RotateCcw className="size-3" />
+            Clear all
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-function FilterChip({
-  label,
-  count,
-  active,
-  onClick,
-}: {
-  label: string;
-  count?: number;
-  active: boolean;
-  onClick: () => void;
-}) {
+function FilterTag({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
+    <span className="inline-flex items-center gap-1 rounded-md bg-raised border border-line px-2 py-0.5 text-xs text-fg">
+      <span>{label}</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="rounded p-0.5 text-muted hover:text-fg hover:bg-surface"
+      >
+        <X className="size-3" />
+      </button>
+    </span>
+  );
+}
+
+export function MarketplaceSidebarFilters({
+  counts = {},
+  className,
+}: {
+  counts?: Record<string, number>;
+  className?: string;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [, startTransition] = useTransition();
+
+  const category = searchParams.get("category") ?? "";
+  const license = searchParams.get("license") ?? "";
+  const priceFilter = searchParams.get("price") ?? "";
+  const format = searchParams.get("format") ?? "";
+  const material = searchParams.get("material") ?? "";
+
+  function apply(next: Record<string, string | null>) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("page");
+    for (const [key, value] of Object.entries(next)) {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    }
+    startTransition(() => router.replace(`${pathname}?${params.toString()}`, { scroll: false }));
+  }
+
+  return (
+    <aside
       className={cn(
-        "rounded-full border px-3.5 py-2 min-h-[44px] sm:min-h-0 sm:py-1 sm:px-3 text-xs font-medium transition-colors cursor-pointer inline-flex items-center justify-center",
-        active
-          ? "border-accent bg-accent-muted text-accent shadow-xs"
-          : "border-line-control text-muted hover:bg-raised hover:text-fg"
+        "flex flex-col gap-6 rounded-xl border border-line bg-surface/60 p-4 backdrop-blur-xs",
+        className
       )}
     >
-      {label}
-      {count ? <span className="ml-1.5 text-faint">({count})</span> : null}
-    </button>
+      <div className="flex items-center justify-between pb-3 border-b border-line/60">
+        <div className="flex items-center gap-2">
+          <Filter className="size-4 text-accent" aria-hidden="true" />
+          <h3 className="font-display text-sm font-semibold uppercase tracking-wider text-fg">
+            Filters
+          </h3>
+        </div>
+      </div>
+
+      {/* 1. Category */}
+      <div className="flex flex-col gap-2.5">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted">
+          Category
+        </h4>
+        <div className="flex flex-col gap-1 text-xs">
+          <label className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-raised cursor-pointer text-fg">
+            <span className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="filter-cat"
+                checked={!category}
+                onChange={() => apply({ category: null })}
+                className="accent-accent"
+              />
+              <span>All Categories</span>
+            </span>
+          </label>
+          {CATEGORY_LIST.slice(0, 8).map((cat) => {
+            const isChecked =
+              category.toLowerCase() === cat.label.toLowerCase() ||
+              category.toLowerCase() === cat.id.toLowerCase();
+            const count = counts[cat.label] ?? counts[cat.id];
+            return (
+              <label
+                key={cat.id}
+                className={cn(
+                  "flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-raised cursor-pointer transition-colors",
+                  isChecked ? "bg-accent-muted/40 font-medium text-accent" : "text-muted hover:text-fg"
+                )}
+              >
+                <span className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="filter-cat"
+                    checked={isChecked}
+                    onChange={() => apply({ category: isChecked ? null : cat.label })}
+                    className="accent-accent"
+                  />
+                  <span>{cat.label}</span>
+                </span>
+                {count !== undefined && count > 0 && (
+                  <span className="font-mono text-[11px] text-faint">({count})</span>
+                )}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 2. License */}
+      <div className="flex flex-col gap-2.5 border-t border-line/50 pt-4">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted">
+          License
+        </h4>
+        <div className="flex flex-col gap-1 text-xs">
+          <label className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-raised cursor-pointer text-fg">
+            <span className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="filter-license"
+                checked={!license}
+                onChange={() => apply({ license: null })}
+                className="accent-accent"
+              />
+              <span>All Licenses</span>
+            </span>
+          </label>
+          {MODEL_LICENSE_LIST.map((lic) => {
+            const isChecked = license === lic.id;
+            return (
+              <label
+                key={lic.id}
+                className={cn(
+                  "flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-raised cursor-pointer transition-colors",
+                  isChecked ? "bg-accent-muted/40 font-medium text-accent" : "text-muted hover:text-fg"
+                )}
+              >
+                <span className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="filter-license"
+                    checked={isChecked}
+                    onChange={() => apply({ license: isChecked ? null : lic.id })}
+                    className="accent-accent"
+                  />
+                  <span>{lic.badge}</span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 3. Price Filter */}
+      <div className="flex flex-col gap-2.5 border-t border-line/50 pt-4">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted">
+          Price
+        </h4>
+        <div className="flex flex-col gap-1 text-xs">
+          {[
+            { id: "", label: "All Prices" },
+            { id: "free", label: "Free only" },
+            { id: "paid", label: "Paid models" },
+          ].map((item) => (
+            <label
+              key={item.id}
+              className={cn(
+                "flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-raised cursor-pointer transition-colors",
+                priceFilter === item.id ? "bg-accent-muted/40 font-medium text-accent" : "text-muted hover:text-fg"
+              )}
+            >
+              <input
+                type="radio"
+                name="filter-price"
+                checked={priceFilter === item.id}
+                onChange={() => apply({ price: item.id || null })}
+                className="accent-accent"
+              />
+              <span>{item.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* 4. Format Filter */}
+      <div className="flex flex-col gap-2.5 border-t border-line/50 pt-4">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted">
+          File Format
+        </h4>
+        <div className="flex flex-wrap gap-1.5">
+          {MODEL_FORMATS.map((fmt) => {
+            const isChecked = format === fmt;
+            return (
+              <button
+                key={fmt}
+                type="button"
+                onClick={() => apply({ format: isChecked ? null : fmt })}
+                className={cn(
+                  "rounded-md border px-2.5 py-1 font-mono text-[11px] font-medium transition-colors cursor-pointer",
+                  isChecked
+                    ? "border-accent bg-accent text-accent-contrast font-bold"
+                    : "border-line bg-surface text-muted hover:border-line-strong hover:text-fg"
+                )}
+              >
+                .{fmt.toLowerCase()}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 5. Print Material Recommendation */}
+      <div className="flex flex-col gap-2.5 border-t border-line/50 pt-4">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted">
+          Print Material
+        </h4>
+        <div className="flex flex-wrap gap-1.5">
+          {PRINT_MATERIALS.map((mat) => {
+            const isChecked = material === mat;
+            return (
+              <button
+                key={mat}
+                type="button"
+                onClick={() => apply({ material: isChecked ? null : mat })}
+                className={cn(
+                  "rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer",
+                  isChecked
+                    ? "border-accent bg-accent text-accent-contrast font-bold"
+                    : "border-line bg-surface text-muted hover:border-line-strong hover:text-fg"
+                )}
+              >
+                {mat}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </aside>
   );
+}
+
+// Backward compatibility export
+export function ModelsFilters({ counts }: { counts: Record<string, number> }) {
+  return <MarketplaceSidebarFilters counts={counts} />;
 }

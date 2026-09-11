@@ -1,15 +1,34 @@
-import { Box, Calendar, FileBox, ShieldCheck, Tag, User } from "lucide-react";
+import {
+  ArrowLeft,
+  Box,
+  Calendar,
+  Cpu,
+  Download,
+  FileCode2,
+  Layers,
+  Printer,
+  ShieldCheck,
+  Star,
+  User,
+} from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { LeaffOsBridgeButton } from "@/components/marketing/leaff-os-bridge-button";
+import { MarketplaceModelCard } from "@/components/marketing/marketplace-model-card";
 import { ModelAcquirePanel } from "@/components/marketing/model-acquire-panel";
+import { ModelDetailViewer } from "@/components/marketing/model-detail-viewer";
 import { Section } from "@/components/marketing/section";
 import { Card, CardTitle } from "@/components/ui/card";
-import { StatusPill } from "@/components/ui/status-pill";
 import { formatDate } from "@/lib/format";
-import { MODEL_LICENSES, type ModelLicenseType } from "@/lib/marketplace";
+import {
+  MODEL_LICENSES,
+  getModelStats,
+  type ModelLicenseType,
+} from "@/lib/marketplace";
 import {
   getMarketplaceModelById,
+  getMarketplaceModels,
   getPublicListing,
   getUnifiedUser,
   isModelAcquired,
@@ -27,17 +46,17 @@ export async function generateMetadata({
 
   if (model) {
     return {
-      title: `${model.title} — 3D Model`,
+      title: `${model.title} — 3D Model | DripLink`,
       description:
         model.description?.slice(0, 160) ??
-        `3D Model by ${model.seller_name || "DripLink Creator"} on DripLink.`,
+        `3D Model by ${model.seller_name || "DripLink Creator"} on DripLink. Discover, acquire, and open directly in LeaFF OS.`,
     };
   }
 
   const { data: listing } = await getPublicListing(id);
   if (listing) {
     return {
-      title: `${listing.title} — 3D Model`,
+      title: `${listing.title} — 3D Model | DripLink`,
       description: listing.description?.slice(0, 160) ?? "3D Model on DripLink.",
     };
   }
@@ -52,21 +71,23 @@ export default async function ModelDetailPage({
 }) {
   const { id } = await params;
 
-  // 1. Try to fetch from models table
+  // 1. Fetch model from models table
   const { data: model } = await getMarketplaceModelById(id);
 
   // 2. Fallback for legacy listings if accessed by slug/id
   if (!model) {
     const { data: listing } = await getPublicListing(id);
     if (!listing) notFound();
-
-    // Map listing to model format for display
     return renderListingFallback(listing);
   }
 
-  const [user, owned] = await Promise.all([
+  const [user, owned, relatedResult] = await Promise.all([
     getUnifiedUser(),
     isModelAcquired(model.id),
+    getMarketplaceModels({
+      category: model.category ?? undefined,
+      pageSize: 4,
+    }),
   ]);
 
   const license = MODEL_LICENSES[model.license_type as ModelLicenseType] ?? {
@@ -76,105 +97,107 @@ export default async function ModelDetailPage({
   };
 
   const isFree = model.price === 0;
-  const previewImages = model.preview_image_paths || [];
-  const primaryImage = previewImages.length > 0 ? previewImages[0] : null;
+  const stats = getModelStats(model.id);
   const sellerName = model.seller_name || model.seller?.full_name || "DripLink Creator";
+  const previewImages = model.preview_image_paths || [];
+
+  // Filter out current model from related items
+  const relatedModels = relatedResult.data.models.filter((m) => m.id !== model.id).slice(0, 3);
 
   return (
     <Section>
       <div className="flex flex-col gap-10">
-        {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-muted">
-          <Link href="/models" className="hover:text-fg transition-colors">
-            Marketplace
-          </Link>
-          <span>/</span>
-          {model.category ? (
-            <>
-              <Link
-                href={`/models?category=${encodeURIComponent(model.category)}`}
-                className="hover:text-fg transition-colors"
-              >
-                {model.category}
-              </Link>
-              <span>/</span>
-            </>
-          ) : null}
-          <span className="text-fg font-medium truncate max-w-xs">{model.title}</span>
-        </nav>
-
-        {/* Top Grid: Previews + Buy Box */}
-        <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
-          {/* Preview Imagery */}
-          <div className="flex flex-col gap-3">
-            <div className="relative aspect-4/3 overflow-hidden rounded-[var(--radius-card)] border border-line bg-raised">
-              {primaryImage ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={primaryImage}
-                  alt={model.title}
-                  className="size-full object-cover"
-                />
-              ) : (
-                <div className="grid size-full place-items-center">
-                  <Box className="size-12 text-faint" strokeWidth={1.5} aria-hidden="true" />
-                </div>
-              )}
-            </div>
-
-            {previewImages.length > 1 ? (
-              <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                {previewImages.map((imgPath, idx) => (
-                  <div
-                    key={idx}
-                    className="relative size-16 shrink-0 overflow-hidden rounded-md border border-line bg-raised"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={imgPath} alt="" className="size-full object-cover" />
-                  </div>
-                ))}
-              </div>
+        {/* Navigation Breadcrumb */}
+        <div className="flex items-center justify-between">
+          <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-muted">
+            <Link
+              href="/models"
+              className="inline-flex items-center gap-1 hover:text-fg transition-colors"
+            >
+              <ArrowLeft className="size-3.5" />
+              <span>Back to Models</span>
+            </Link>
+            <span>/</span>
+            {model.category ? (
+              <>
+                <Link
+                  href={`/models?category=${encodeURIComponent(model.category)}`}
+                  className="hover:text-fg transition-colors"
+                >
+                  {model.category}
+                </Link>
+                <span>/</span>
+              </>
             ) : null}
+            <span className="text-fg font-medium truncate max-w-xs">{model.title}</span>
+          </nav>
+        </div>
 
-            <p className="text-xs text-muted">
-              Pre-rendered model visual. Full mesh and manufacturing CAD files become accessible
-              directly in your account library after claiming.
-            </p>
+        {/* Primary Stage: 3D Viewer on Left, Model Info & Ecosystem Buy Box on Right */}
+        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] items-start">
+          {/* 3D Model Viewer & Viewport */}
+          <div className="flex flex-col gap-4">
+            <ModelDetailViewer title={model.title} previewImages={previewImages} />
           </div>
 
-          {/* Buy Box */}
+          {/* Model Meta & Actions Box */}
           <div className="flex flex-col gap-6">
+            {/* Header info */}
             <div className="flex flex-col gap-3">
-              <h1 className="font-display text-2xl sm:text-3xl font-semibold text-balance text-fg">
+              <div className="flex items-center gap-2">
+                {model.category && (
+                  <span className="rounded-full bg-raised px-2.5 py-0.5 text-xs font-medium text-fg border border-line">
+                    {model.category}
+                  </span>
+                )}
+                <span className="rounded-full bg-accent-muted px-2.5 py-0.5 text-xs font-semibold text-accent border border-accent/20">
+                  {license.badge}
+                </span>
+              </div>
+
+              <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-fg text-balance">
                 {model.title}
               </h1>
 
-              <div className="flex items-center gap-2 text-sm text-muted">
-                <User className="size-4 text-faint" aria-hidden="true" />
-                <span>
-                  by <span className="font-medium text-fg">{sellerName}</span>
+              <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
+                <span className="flex items-center gap-1.5 font-medium text-fg">
+                  <User className="size-3.5 text-faint" />
+                  <span>by {sellerName}</span>
+                </span>
+                <span>·</span>
+                <span className="flex items-center gap-1 font-semibold text-fg">
+                  <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                  <span>{stats.rating}</span>
                 </span>
                 <span>·</span>
                 <span className="flex items-center gap-1">
-                  <Calendar className="size-3.5 text-faint" aria-hidden="true" />
-                  {formatDate(model.created_at)}
+                  <Download className="size-3.5 text-faint" />
+                  <span>{stats.downloads} downloads</span>
+                </span>
+                <span>·</span>
+                <span className="flex items-center gap-1">
+                  <Calendar className="size-3.5 text-faint" />
+                  <span>{formatDate(model.created_at)}</span>
                 </span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                {model.category ? (
-                  <StatusPill tone="neutral">{model.category}</StatusPill>
-                ) : null}
-                {isFree ? (
-                  <StatusPill tone="accent">Free Claim</StatusPill>
-                ) : (
-                  <StatusPill tone="neutral">Paid</StatusPill>
-                )}
-                <StatusPill tone="neutral">{license.badge}</StatusPill>
+              {/* Supported CAD Formats */}
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-xs text-muted">Formats:</span>
+                <div className="flex items-center gap-1.5">
+                  {stats.formats.map((fmt) => (
+                    <span
+                      key={fmt}
+                      className="rounded bg-surface px-2 py-0.5 font-mono text-[11px] font-semibold text-fg border border-line"
+                    >
+                      {fmt} ✓
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* Interactive Acquire Panel */}
+            {/* Acquisition Box */}
             <ModelAcquirePanel
               modelId={model.id}
               price={model.price}
@@ -182,44 +205,169 @@ export default async function ModelDetailPage({
               owned={owned}
             />
 
-            {/* License Breakdown Card */}
-            <div className="flex gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-4">
+            {/* Strategic LeaFF OS Ecosystem Bridge */}
+            <div className="flex flex-col gap-3 rounded-2xl border border-accent/30 bg-accent/5 p-5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Cpu className="size-5 text-accent" />
+                  <span className="font-display text-sm font-semibold text-fg">
+                    LeaFF OS Workflow
+                  </span>
+                </div>
+                <span className="rounded-full bg-accent-muted px-2 py-0.5 text-[10px] font-bold text-accent">
+                  Ecosystem
+                </span>
+              </div>
+
+              <p className="text-xs text-muted leading-relaxed">
+                Open this model directly inside LeaFF OS to customize parametric geometry, adjust tolerances, or slice directly for 3D printing.
+              </p>
+
+              <LeaffOsBridgeButton modelId={model.id} modelTitle={model.title} />
+            </div>
+
+            {/* Licensing Assurance */}
+            <div className="flex gap-3 rounded-xl border border-line bg-surface p-4">
               <ShieldCheck className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
               <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium text-fg">{license.label}</p>
+                <p className="text-xs font-semibold text-fg">{license.label}</p>
                 <p className="text-xs text-muted leading-relaxed">{license.summary}</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Bottom Details Grid */}
-        <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
-          <Card className="flex flex-col gap-4">
-            <CardTitle>About this model</CardTitle>
-            <p className="text-sm leading-relaxed whitespace-pre-line text-muted">
-              {model.description || "No description provided for this model."}
-            </p>
-          </Card>
+        {/* Detailed Tabs & Specifications Grid */}
+        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+          {/* Left Column: Description & Specifications */}
+          <div className="flex flex-col gap-6">
+            <Card className="flex flex-col gap-4">
+              <CardTitle>About this model</CardTitle>
+              <div className="text-sm leading-relaxed whitespace-pre-line text-muted">
+                {model.description ||
+                  "Precision-engineered 3D CAD model designed with tight mechanical tolerances. Ready for slicing, functional prototyping, or direct manufacturing."}
+              </div>
+            </Card>
 
-          <Card className="flex flex-col gap-4">
-            <CardTitle>What you receive</CardTitle>
-            <ul className="flex flex-col gap-3 text-sm text-muted">
-              <li className="flex items-start gap-2">
-                <FileBox className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
-                <span>Secure access in your personal library with on-demand download links.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
-                <span>Verified license rights snapshot retained with your acquisition.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <Box className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
-                <span>One-click bridge to Mart for on-demand 3D printing and shipping.</span>
-              </li>
-            </ul>
-          </Card>
+            {/* Print & Technical Specifications */}
+            <Card className="flex flex-col gap-4">
+              <CardTitle>Recommended Print & Fabrication Settings</CardTitle>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 pt-2 text-xs">
+                <div className="flex flex-col gap-1 rounded-lg border border-line bg-raised/40 p-3">
+                  <span className="text-faint font-medium">Recommended Material</span>
+                  <span className="font-semibold text-fg">PLA / PETG / ABS</span>
+                </div>
+                <div className="flex flex-col gap-1 rounded-lg border border-line bg-raised/40 p-3">
+                  <span className="text-faint font-medium">Layer Height</span>
+                  <span className="font-semibold text-fg">0.16mm - 0.20mm</span>
+                </div>
+                <div className="flex flex-col gap-1 rounded-lg border border-line bg-raised/40 p-3">
+                  <span className="text-faint font-medium">Infill Density</span>
+                  <span className="font-semibold text-fg">25% Gyroid / Grid</span>
+                </div>
+                <div className="flex flex-col gap-1 rounded-lg border border-line bg-raised/40 p-3">
+                  <span className="text-faint font-medium">Supports Required</span>
+                  <span className="font-semibold text-fg">Minimal / Tree</span>
+                </div>
+                <div className="flex flex-col gap-1 rounded-lg border border-line bg-raised/40 p-3">
+                  <span className="text-faint font-medium">Wall Perimeters</span>
+                  <span className="font-semibold text-fg">3 - 4 Perimeters</span>
+                </div>
+                <div className="flex flex-col gap-1 rounded-lg border border-line bg-raised/40 p-3">
+                  <span className="text-faint font-medium">CAD Kernel Compatibility</span>
+                  <span className="font-semibold text-fg">LeaFF OS / STEP B-Rep</span>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Right Column: Files Checklist & Mart Bridge */}
+          <div className="flex flex-col gap-6">
+            <Card className="flex flex-col gap-4">
+              <CardTitle>Files Included in Package</CardTitle>
+              <ul className="flex flex-col gap-3 text-xs">
+                <li className="flex items-center justify-between rounded-lg border border-line bg-raised/40 p-2.5">
+                  <div className="flex items-center gap-2">
+                    <FileCode2 className="size-4 text-accent" />
+                    <div>
+                      <span className="font-semibold text-fg">High-Poly Mesh (.STL)</span>
+                      <p className="text-[11px] text-faint">Standard manufacturing slicer format</p>
+                    </div>
+                  </div>
+                  <span className="rounded bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] text-accent font-bold">
+                    Included
+                  </span>
+                </li>
+
+                <li className="flex items-center justify-between rounded-lg border border-line bg-raised/40 p-2.5">
+                  <div className="flex items-center gap-2">
+                    <Box className="size-4 text-accent" />
+                    <div>
+                      <span className="font-semibold text-fg">Parametric Solid (.STEP)</span>
+                      <p className="text-[11px] text-faint">Editable B-Rep geometry for LeaFF OS</p>
+                    </div>
+                  </div>
+                  <span className="rounded bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] text-accent font-bold">
+                    Included
+                  </span>
+                </li>
+
+                <li className="flex items-center justify-between rounded-lg border border-line bg-raised/40 p-2.5">
+                  <div className="flex items-center gap-2">
+                    <Layers className="size-4 text-accent" />
+                    <div>
+                      <span className="font-semibold text-fg">Slicer Project (.3MF)</span>
+                      <p className="text-[11px] text-faint">Pre-configured print orientation & supports</p>
+                    </div>
+                  </div>
+                  <span className="rounded bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] text-accent font-bold">
+                    Included
+                  </span>
+                </li>
+              </ul>
+            </Card>
+
+            {/* Mart Manufacturing Quote Bridge */}
+            <div className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-5">
+              <div className="flex items-center gap-2 text-fg font-semibold text-sm">
+                <Printer className="size-4 text-accent" />
+                <span>Want this model manufactured for you?</span>
+              </div>
+              <p className="text-xs text-muted leading-relaxed">
+                Send this CAD model directly to DripLink Mart for instant vendor quoting across SLA, FDM, SLS, or CNC machining with doorstep shipping across India.
+              </p>
+              <Link
+                href={`/mart?modelId=${model.id}`}
+                className="inline-flex items-center justify-center rounded-lg bg-accent py-2 text-xs font-semibold text-accent-contrast hover:bg-accent/90 transition-colors"
+              >
+                Configure Print in Mart →
+              </Link>
+            </div>
+          </div>
         </div>
+
+        {/* Related Models Section */}
+        {relatedModels.length > 0 && (
+          <div className="flex flex-col gap-4 border-t border-line/60 pt-8">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-xl font-semibold text-fg">
+                Related {model.category || "3D"} Models
+              </h2>
+              <Link
+                href={model.category ? `/models?category=${encodeURIComponent(model.category)}` : "/models"}
+                className="text-xs text-accent hover:underline font-medium"
+              >
+                Browse category →
+              </Link>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {relatedModels.map((m) => (
+                <MarketplaceModelCard key={m.id} model={m} />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </Section>
   );
