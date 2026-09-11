@@ -129,9 +129,13 @@ export async function claimFreeModel(modelId: string): Promise<ClaimResult> {
 
 /**
  * Generates a signed, time-limited download URL for an acquired model file.
+ * Supports downloading specific multi-part files via optional fileId.
  * The raw storage file_path is never exposed publicly to unauthenticated users.
  */
-export async function getModelDownloadUrl(modelId: string): Promise<DownloadUrlResult> {
+export async function getModelDownloadUrl(
+  modelId: string,
+  fileId?: string
+): Promise<DownloadUrlResult> {
   const user = await getUnifiedUser();
   if (!user) {
     return { success: false, error: "Please sign in to download this model." };
@@ -180,14 +184,42 @@ export async function getModelDownloadUrl(modelId: string): Promise<DownloadUrlR
       return { success: false, error: "You must add this model to your library first." };
     }
 
-    if (!model.file_path) {
+    // Determine target storage path
+    let targetPath = model.file_path;
+
+    if (fileId) {
+      const { data: specificFile } = await serviceSupabase
+        .from("model_files")
+        .select("storage_path")
+        .eq("id", fileId)
+        .eq("model_id", modelId)
+        .maybeSingle();
+
+      if (specificFile?.storage_path) {
+        targetPath = specificFile.storage_path;
+      }
+    } else {
+      // Check if primary file in model_files exists
+      const { data: primaryFile } = await serviceSupabase
+        .from("model_files")
+        .select("storage_path")
+        .eq("model_id", modelId)
+        .eq("is_primary", true)
+        .maybeSingle();
+
+      if (primaryFile?.storage_path) {
+        targetPath = primaryFile.storage_path;
+      }
+    }
+
+    if (!targetPath) {
       return { success: false, error: "No download file is associated with this model." };
     }
 
     // 2. Generate signed URL (valid for 1 hour)
     const { data: signData, error: signErr } = await supabase.storage
       .from("model-files")
-      .createSignedUrl(model.file_path, 3600, {
+      .createSignedUrl(targetPath, 3600, {
         download: true,
       });
 
@@ -196,12 +228,64 @@ export async function getModelDownloadUrl(modelId: string): Promise<DownloadUrlR
       return { success: false, error: "Failed to generate download link." };
     }
 
+    // 3. Log download event in model_events
+    try {
+      await serviceSupabase
+        .from("model_events")
+        .insert({
+          model_id: modelId,
+          user_id: user.id,
+          event_type: "download",
+          metadata: { file_id: fileId || "primary", path: targetPath },
+        });
+    } catch {
+      // Non-blocking telemetry
+    }
+
     return { success: true, downloadUrl: signData.signedUrl };
   } catch (err) {
     console.error("getModelDownloadUrl exception:", err);
     return {
       success: false,
       error: err instanceof Error ? err.message : "Failed to generate download link.",
+    };
+  }
+}
+
+/**
+ * Toggles favorite state for a model for the current user.
+ */
+export async function toggleModelFavoriteAction(
+  modelId: string
+): Promise<{ success: boolean; favorited?: boolean; error?: string }> {
+  const user = await getUnifiedUser();
+  if (!user) {
+    return { success: false, error: "Please sign in to favorite models." };
+  }
+
+  const serviceSupabase = getSupabaseServiceClient();
+  if (!serviceSupabase) {
+    return { success: false, error: "Database backend is not connected." };
+  }
+
+  try {
+    const { data, error } = await serviceSupabase.rpc("toggle_model_favorite", {
+      p_user_id: user.id,
+      p_model_id: modelId,
+    });
+
+    if (error) {
+      console.error("toggle_model_favorite RPC error:", error);
+      return { success: false, error: error.message };
+    }
+
+    const parsed = typeof data === "string" ? JSON.parse(data) : data;
+    revalidatePath(`/models/${modelId}`);
+    return { success: true, favorited: Boolean(parsed?.favorited) };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to favorite model.",
     };
   }
 }

@@ -6,13 +6,17 @@ import { getUnifiedUser, isClerkConfigured, syncClerkProfile } from "@/driplink-
 import { LISTING_SORTS, type Category, type ListingSort } from "@/lib/marketplace";
 import type {
   AcquiredModel,
+  CategoryRecord,
   FreelanceRequest,
   FreelancerProfile,
   LedgerEntry,
   LibraryItem,
+  LicenseRecord,
   Listing,
   MarketplaceLicenseType,
   MarketplaceModel,
+  ModelFileRecord,
+  ModelVersionRecord,
   PublicListing,
   MartOrder,
   MartVendorOrder,
@@ -616,6 +620,75 @@ export async function getAdminPendingListings(): Promise<QueryResult<AdminListin
   return { data: (data as unknown as AdminListing[]) ?? [], backendReady: true };
 }
 
+export type AdminPendingModel = {
+  id: string;
+  title: string;
+  slug: string;
+  category: string;
+  price: number;
+  status: string;
+  created_at: string;
+  seller_name: string;
+  thumbnail_url: string | null;
+  part_count: number;
+  license_type?: string | null;
+};
+
+export async function getAdminPendingModels(): Promise<QueryResult<AdminPendingModel[]>> {
+  const serviceSupabase = getSupabaseServiceClient();
+  const supabase = await getSupabaseServerClient();
+  const client = serviceSupabase ?? supabase;
+  if (!client) return empty([]);
+
+  const { data: rpcData, error: rpcError } = await client.rpc("admin_get_pending_models");
+  if (!rpcError && rpcData) {
+    const models: AdminPendingModel[] = (rpcData as Array<Record<string, unknown>>).map((row) => ({
+      id: String(row.id),
+      title: String(row.title),
+      slug: String(row.slug),
+      category: String(row.category || "General"),
+      price: Number(row.price || 0),
+      status: String(row.status || "pending_review"),
+      created_at: String(row.created_at),
+      seller_name: String(row.seller_name || "Creator"),
+      thumbnail_url: (row.thumbnail_url as string) ?? null,
+      part_count: Number(row.part_count || 1),
+      license_type: (row.license_type as string) || "standard",
+    }));
+    return { data: models, backendReady: true };
+  }
+
+  const { data, error } = await client
+    .from("models")
+    .select("id, title, name, slug, category, price, status, license_type, created_at, thumbnail_url, seller:profiles!models_seller_user_id_fkey(full_name)")
+    .in("status", ["pending_review", "under_review", "draft"])
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("getAdminPendingModels error:", error);
+    return empty([]);
+  }
+
+  const models: AdminPendingModel[] = ((data as unknown as Array<Record<string, unknown>>) ?? []).map((row) => {
+    const seller = row.seller as { full_name: string | null } | null;
+    return {
+      id: String(row.id),
+      title: String(row.title || row.name || "Untitled Model"),
+      slug: String(row.slug || row.id),
+      category: String(row.category || "General"),
+      price: Number(row.price || 0),
+      status: String(row.status || "pending_review"),
+      created_at: String(row.created_at),
+      seller_name: seller?.full_name || "Independent Creator",
+      thumbnail_url: (row.thumbnail_url as string) ?? null,
+      part_count: 1,
+      license_type: (row.license_type as string) || "standard",
+    };
+  });
+
+  return { data: models, backendReady: true };
+}
+
 export type AdminMartOrder = MartOrder & {
   assigned_vendor: string | null;
   vendor_notes: string | null;
@@ -723,6 +796,7 @@ export async function getMarketplaceModels(options: {
         created_at: string;
         seller_name: string;
         seller_avatar: string | null;
+        formats?: string[];
       }) => ({
         id: row.id,
         seller_user_id: row.seller_user_id,
@@ -736,6 +810,7 @@ export async function getMarketplaceModels(options: {
         created_at: row.created_at,
         seller_name: row.seller_name,
         seller_avatar: row.seller_avatar,
+        formats: row.formats ?? ["STL"],
         seller: row.seller_user_id
           ? {
               id: row.seller_user_id,
@@ -848,6 +923,7 @@ export async function getMarketplaceModelById(
         id: row.id,
         seller_user_id: row.seller_user_id,
         title: row.title,
+        slug: row.slug,
         description: row.description,
         category: row.category,
         license_type: row.license_type,
@@ -858,6 +934,10 @@ export async function getMarketplaceModelById(
         created_at: row.created_at,
         seller_name: row.seller_name,
         seller_avatar: row.seller_avatar,
+        formats: row.formats ?? ["STL"],
+        files: row.files ?? [],
+        images: row.images ?? [],
+        license_info: row.license_info ?? null,
         seller: row.seller_user_id
           ? {
               id: row.seller_user_id,
@@ -872,7 +952,7 @@ export async function getMarketplaceModelById(
     const { data, error } = await supabase
       .from("models")
       .select(
-        "id, seller_user_id, title, description, category, license_type, price, preview_image_paths, file_path, status, created_at, seller:profiles!models_seller_user_id_fkey(id, full_name, avatar_url)"
+        "id, seller_user_id, title, slug, description, category, license_type, price, preview_image_paths, file_path, status, created_at, seller:profiles!models_seller_user_id_fkey(id, full_name, avatar_url)"
       )
       .eq("id", modelId)
       .eq("status", "published")
@@ -889,6 +969,7 @@ export async function getMarketplaceModelById(
       id: data.id,
       seller_user_id: data.seller_user_id,
       title: data.title,
+      slug: data.slug,
       description: data.description,
       category: data.category,
       license_type: data.license_type,
@@ -899,6 +980,7 @@ export async function getMarketplaceModelById(
       created_at: data.created_at,
       seller_name: sellerProfile?.full_name ?? "DripLink Creator",
       seller_avatar: sellerProfile?.avatar_url ?? null,
+      formats: ["STL", "STEP", "3MF"],
       seller: sellerProfile,
     };
 
@@ -960,6 +1042,7 @@ export async function getUserAcquiredModels(): Promise<QueryResult<AcquiredModel
         preview_image_paths: string[] | null;
         file_path: string;
         seller_name: string;
+        formats?: string[];
       }) => ({
         acquisition_id: row.acquisition_id,
         acquired_at: row.acquired_at,
@@ -972,6 +1055,7 @@ export async function getUserAcquiredModels(): Promise<QueryResult<AcquiredModel
         preview_image_paths: row.preview_image_paths ?? [],
         file_path: row.file_path,
         seller_name: row.seller_name,
+        formats: row.formats ?? ["STL"],
       }));
 
       return { data: models, backendReady: true };
@@ -1054,6 +1138,83 @@ export async function getMarketplaceCategoryCounts(): Promise<
     }
   }
   return { data: counts, backendReady: true };
+}
+
+export async function getCategoriesHierarchy(): Promise<QueryResult<CategoryRecord[]>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty([]);
+
+  const { data, error } = await supabase
+    .from("categories")
+    .select("id, parent_id, name, slug, description, icon, sort_order")
+    .order("sort_order", { ascending: true });
+
+  if (error || !data) return empty([]);
+  return { data: data as CategoryRecord[], backendReady: true };
+}
+
+export async function getLicensesList(): Promise<QueryResult<LicenseRecord[]>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty([]);
+
+  const { data, error } = await supabase
+    .from("licenses")
+    .select("id, name, slug, description, allows_commercial, allows_remix, requires_attribution, is_custom")
+    .order("sort_order", { ascending: true });
+
+  if (error || !data) return empty([]);
+  return { data: data as LicenseRecord[], backendReady: true };
+}
+
+export async function getModelVersions(modelId: string): Promise<QueryResult<ModelVersionRecord[]>> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return empty([]);
+
+  const { data, error } = await supabase
+    .from("model_versions")
+    .select("id, model_id, version_number, changelog, created_at, is_current")
+    .eq("model_id", modelId)
+    .order("created_at", { ascending: false });
+
+  if (error || !data) return empty([]);
+  return { data: data as ModelVersionRecord[], backendReady: true };
+}
+
+export async function getModelFiles(modelId: string): Promise<QueryResult<ModelFileRecord[]>> {
+  const serviceSupabase = getSupabaseServiceClient();
+  const supabase = await getSupabaseServerClient();
+  const client = serviceSupabase ?? supabase;
+  if (!client) return empty([]);
+
+  const { data, error } = await client
+    .from("model_files")
+    .select("id, filename, format, file_size, is_primary, storage_path")
+    .eq("model_id", modelId)
+    .order("is_primary", { ascending: false });
+
+  if (error || !data) return empty([]);
+  return { data: data as ModelFileRecord[], backendReady: true };
+}
+
+export async function isModelFavorited(modelId: string, userId?: string): Promise<boolean> {
+  const supabase = await getOwnerQueryClient();
+  if (!supabase) return false;
+
+  let targetUserId = userId;
+  if (!targetUserId) {
+    const user = await getUnifiedUser();
+    if (!user) return false;
+    targetUserId = user.id;
+  }
+
+  const { data } = await supabase
+    .from("model_favorites")
+    .select("id")
+    .eq("user_id", targetUserId)
+    .eq("model_id", modelId)
+    .maybeSingle();
+
+  return Boolean(data);
 }
 
 /* ----------------------------------------------------------- Freelance queries */

@@ -2,8 +2,6 @@
 
 import "server-only";
 import { revalidatePath } from "next/cache";
-import { getUnifiedUser } from "@/driplink-web-backend/auth/clerk";
-import { getSupabaseServiceClient } from "@/driplink-web-backend/db/client";
 import { ensureAdmin } from "@/lib/admin-guard";
 
 export type AdminActionResult = {
@@ -62,6 +60,56 @@ export async function updateListingStatusAdmin({
   revalidatePath("/admin/listings");
   revalidatePath("/admin");
   revalidatePath("/models");
+  return { success: true };
+}
+
+/**
+ * Reviews a 3D model listing (status 'published' or 'rejected') with review notes.
+ * Calls public.admin_review_model PostgreSQL RPC through ensureAdmin().
+ */
+export async function updateModelStatusAdmin({
+  modelId,
+  status,
+  reviewNotes,
+}: {
+  modelId: string;
+  status: "published" | "rejected";
+  reviewNotes?: string;
+}): Promise<AdminActionResult> {
+  const guard = await ensureAdmin();
+  if (!guard.ok) {
+    return { success: false, error: guard.error };
+  }
+
+  const { error: rpcErr } = await guard.client.rpc("admin_review_model", {
+    p_model_id: modelId,
+    p_status: status,
+    p_notes: reviewNotes || null,
+  });
+
+  if (rpcErr) {
+    console.error("Failed to review model via RPC:", rpcErr);
+    // Fallback direct update
+    const { error: updateErr } = await guard.client
+      .from("models")
+      .update({
+        status,
+        published_at: status === "published" ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", modelId);
+
+    if (updateErr) {
+      return { success: false, error: updateErr.message || "Failed to update model status." };
+    }
+  }
+
+  revalidatePath("/admin/models");
+  revalidatePath("/admin/listings");
+  revalidatePath("/admin");
+  revalidatePath("/models");
+  revalidatePath(`/models/${modelId}`);
+  revalidatePath("/dashboard/models");
   return { success: true };
 }
 

@@ -284,46 +284,67 @@ export default async function ModelDetailPage({
           {/* Right Column: Files Checklist & Mart Bridge */}
           <div className="flex flex-col gap-6">
             <Card className="flex flex-col gap-4">
-              <CardTitle>Files Included in Package</CardTitle>
+              <CardTitle>Files Included in Package ({model.files?.length || 3})</CardTitle>
               <ul className="flex flex-col gap-3 text-xs">
-                <li className="flex items-center justify-between rounded-lg border border-line bg-raised/40 p-2.5">
-                  <div className="flex items-center gap-2">
-                    <FileCode2 className="size-4 text-accent" />
-                    <div>
-                      <span className="font-semibold text-fg">High-Poly Mesh (.STL)</span>
-                      <p className="text-[11px] text-faint">Standard manufacturing slicer format</p>
-                    </div>
-                  </div>
-                  <span className="rounded bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] text-accent font-bold">
-                    Included
-                  </span>
-                </li>
+                {model.files && model.files.length > 0 ? (
+                  model.files.map((f) => (
+                    <li key={f.id} className="flex items-center justify-between rounded-lg border border-line bg-raised/40 p-2.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileCode2 className="size-4 text-accent shrink-0" />
+                        <div className="min-w-0">
+                          <span className="font-semibold text-fg truncate block">{f.filename}</span>
+                          <p className="text-[11px] text-faint">
+                            {f.format} CAD {f.file_size ? `· ${(f.file_size / (1024 * 1024)).toFixed(1)} MB` : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="rounded bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] text-accent font-bold shrink-0">
+                        {f.is_primary ? "Primary" : "Included"}
+                      </span>
+                    </li>
+                  ))
+                ) : (
+                  <>
+                    <li className="flex items-center justify-between rounded-lg border border-line bg-raised/40 p-2.5">
+                      <div className="flex items-center gap-2">
+                        <FileCode2 className="size-4 text-accent" />
+                        <div>
+                          <span className="font-semibold text-fg">High-Poly Mesh (.STL)</span>
+                          <p className="text-[11px] text-faint">Standard manufacturing slicer format</p>
+                        </div>
+                      </div>
+                      <span className="rounded bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] text-accent font-bold">
+                        Included
+                      </span>
+                    </li>
 
-                <li className="flex items-center justify-between rounded-lg border border-line bg-raised/40 p-2.5">
-                  <div className="flex items-center gap-2">
-                    <Box className="size-4 text-accent" />
-                    <div>
-                      <span className="font-semibold text-fg">Parametric Solid (.STEP)</span>
-                      <p className="text-[11px] text-faint">Editable B-Rep geometry for LeaFF OS</p>
-                    </div>
-                  </div>
-                  <span className="rounded bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] text-accent font-bold">
-                    Included
-                  </span>
-                </li>
+                    <li className="flex items-center justify-between rounded-lg border border-line bg-raised/40 p-2.5">
+                      <div className="flex items-center gap-2">
+                        <Box className="size-4 text-accent" />
+                        <div>
+                          <span className="font-semibold text-fg">Parametric Solid (.STEP)</span>
+                          <p className="text-[11px] text-faint">Editable B-Rep geometry for LeaFF OS</p>
+                        </div>
+                      </div>
+                      <span className="rounded bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] text-accent font-bold">
+                        Included
+                      </span>
+                    </li>
 
-                <li className="flex items-center justify-between rounded-lg border border-line bg-raised/40 p-2.5">
-                  <div className="flex items-center gap-2">
-                    <Layers className="size-4 text-accent" />
-                    <div>
-                      <span className="font-semibold text-fg">Slicer Project (.3MF)</span>
-                      <p className="text-[11px] text-faint">Pre-configured print orientation & supports</p>
-                    </div>
-                  </div>
-                  <span className="rounded bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] text-accent font-bold">
-                    Included
-                  </span>
-                </li>
+                    <li className="flex items-center justify-between rounded-lg border border-line bg-raised/40 p-2.5">
+                      <div className="flex items-center gap-2">
+                        <Layers className="size-4 text-accent" />
+                        <div>
+                          <span className="font-semibold text-fg">Slicer Project (.3MF)</span>
+                          <p className="text-[11px] text-faint">Pre-configured print orientation & supports</p>
+                        </div>
+                      </div>
+                      <span className="rounded bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] text-accent font-bold">
+                        Included
+                      </span>
+                    </li>
+                  </>
+                )}
               </ul>
             </Card>
 

@@ -136,13 +136,67 @@ export type LibraryItem = {
   } | null;
 };
 
-export type MarketplaceLicenseType = "standard" | "cc" | "commercial";
-export type MarketplaceModelStatus = "draft" | "published";
+export type MarketplaceLicenseType = "standard" | "cc" | "commercial" | "personal" | "custom" | string;
+export type MarketplaceModelStatus = "draft" | "pending_review" | "published" | "rejected" | "archived";
+
+export type ModelFileRecord = {
+  id: string;
+  filename: string;
+  format: string;
+  file_size: number;
+  is_primary: boolean;
+  storage_path?: string;
+};
+
+export type ModelImageRecord = {
+  id: string;
+  thumbnail_url: string;
+  is_cover: boolean;
+  alt_text?: string | null;
+};
+
+export type LicenseInfoRecord = {
+  name: string;
+  description: string;
+  allows_commercial: boolean;
+  allows_remix: boolean;
+};
+
+export type CategoryRecord = {
+  id: string;
+  parent_id: string | null;
+  name: string;
+  slug: string;
+  description: string | null;
+  icon: string | null;
+  sort_order: number;
+};
+
+export type LicenseRecord = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  allows_commercial: boolean;
+  allows_remix: boolean;
+  requires_attribution: boolean;
+  is_custom: boolean;
+};
+
+export type ModelVersionRecord = {
+  id: string;
+  model_id: string;
+  version_number: string;
+  changelog: string | null;
+  created_at: string;
+  is_current: boolean;
+};
 
 export type MarketplaceModel = {
   id: string;
   seller_user_id: string | null;
   title: string;
+  slug?: string;
   description: string | null;
   category: string | null;
   license_type: MarketplaceLicenseType;
@@ -153,6 +207,10 @@ export type MarketplaceModel = {
   created_at: string;
   seller_name?: string;
   seller_avatar?: string | null;
+  formats?: string[];
+  files?: ModelFileRecord[];
+  images?: ModelImageRecord[];
+  license_info?: LicenseInfoRecord | null;
   seller?: {
     id: string;
     full_name: string | null;
@@ -172,6 +230,7 @@ export type AcquiredModel = {
   preview_image_paths: string[];
   file_path: string;
   seller_name: string;
+  formats?: string[];
 };
 
 /* ----------------------------------------------------------- Freelance side */

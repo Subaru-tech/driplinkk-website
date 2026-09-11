@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { formatCurrency } from "@/lib/format";
-import { claimFreeModel } from "@/driplink-web-backend/actions/library";
+import { claimFreeModel, getModelDownloadUrl } from "@/driplink-web-backend/actions/library";
 
 export function ModelAcquirePanel({
   modelId,
@@ -23,9 +23,37 @@ export function ModelAcquirePanel({
   const router = useRouter();
   const toast = useToast();
   const [pending, setPending] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [acquired, setAcquired] = useState(owned);
 
   const isFree = price === 0;
+
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      const res = await getModelDownloadUrl(modelId);
+      setDownloading(false);
+
+      if (!res.success || !res.downloadUrl) {
+        toast("error", res.error || "Failed to generate download link.");
+        return;
+      }
+
+      const link = document.createElement("a");
+      link.href = res.downloadUrl;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.download = "";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast("success", "Download link resolved. Starting download...");
+    } catch {
+      setDownloading(false);
+      toast("error", "Error connecting to storage server.");
+    }
+  }
 
   async function handleClaim() {
     if (!signedIn) {
@@ -96,19 +124,30 @@ export function ModelAcquirePanel({
             </p>
           </>
         ) : acquired ? (
-          /* State 2: Free model, already acquired -> 'In your library' */
+          /* State 2: Free model, already acquired -> Direct Download & Library link */
           <>
+            <Button
+              id="direct-download-btn"
+              size="lg"
+              loading={downloading}
+              onClick={handleDownload}
+              className="w-full justify-center gap-2 bg-accent text-accent-contrast font-bold hover:bg-accent-hover"
+            >
+              <Download className="size-4" aria-hidden="true" />
+              Download Model
+            </Button>
             <ButtonLink
               href="/dashboard/library"
               id="in-library-btn"
-              size="lg"
-              className="w-full justify-center"
+              variant="secondary"
+              size="sm"
+              className="w-full justify-center gap-1.5"
             >
-              <Check className="size-4" aria-hidden="true" />
+              <Check className="size-3.5" aria-hidden="true" />
               In your library
             </ButtonLink>
             <p className="text-center text-xs text-muted">
-              You own this model. Open your library to download or preview the file.
+              You own this model. Download the verified file directly or inspect it in LeaFF OS.
             </p>
           </>
         ) : !signedIn ? (

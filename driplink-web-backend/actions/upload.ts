@@ -86,7 +86,16 @@ export async function recordUploadedModel({
   return { data };
 }
 
+export type CreatorModelFileInput = {
+  filename: string;
+  storagePath: string;
+  format: string;
+  fileSize?: number;
+  isPrimary?: boolean;
+};
+
 export type CreatorModelInput = {
+  id?: string;
   title: string;
   description: string;
   category: string;
@@ -104,17 +113,28 @@ export type CreatorModelInput = {
     assemblyNotes?: string;
   };
   filePath?: string;
+  files?: CreatorModelFileInput[];
   previewImagePaths?: string[];
   thumbnailUrl?: string | null;
-  status?: "published" | "under_review" | "draft" | "rejected";
+  status?: "published" | "under_review" | "pending_review" | "draft" | "rejected";
 };
+
+function slugify(text: string): string {
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^\w-]+/g, "")
+    .replace(/--+/g, "-");
+}
 
 export async function publishCreatorModelListing(
   input: CreatorModelInput
 ): Promise<{ success: boolean; data?: { id: string }; error?: string }> {
   const user = await getUnifiedUser();
   if (!user) {
-    return { success: false, error: "You must be signed in to publish a model." };
+    return { success: false, error: "You must be signed in to submit or publish a model." };
   }
 
   const supabase = getSupabaseServiceClient();
@@ -122,6 +142,82 @@ export async function publishCreatorModelListing(
     return { success: false, error: "Backend database is not connected." };
   }
 
+  // 1. Resolve category_id if possible
+  let categoryId: string | null = null;
+  if (input.category) {
+    const catSlug = slugify(input.category);
+    const { data: catData } = await supabase
+      .from("categories")
+      .select("id")
+      .or(`slug.eq.${catSlug},name.ilike.%${input.category}%`)
+      .limit(1)
+      .maybeSingle();
+    if (catData?.id) {
+      categoryId = catData.id;
+    }
+  }
+
+  // 2. Resolve license_id if possible
+  let licenseId: string | null = null;
+  if (input.licenseType) {
+    const licSlug = slugify(input.licenseType);
+    const { data: licData } = await supabase
+      .from("licenses")
+      .select("id")
+      .or(`slug.eq.${licSlug},name.ilike.%${input.licenseType}%`)
+      .limit(1)
+      .maybeSingle();
+    if (licData?.id) {
+      licenseId = licData.id;
+    }
+  }
+
+  const baseSlug = slugify(input.title || "untitled-model");
+  const uniqueSlug = `${baseSlug}-${Date.now().toString(36)}`;
+  const finalStatus = input.status || "pending_review";
+  const primaryFilePath = input.filePath || input.files?.[0]?.storagePath || "models/placeholder.stl";
+
+  // Check if updating existing draft
+  if (input.id) {
+    const { data: existing } = await supabase
+      .from("models")
+      .select("id, owner_id")
+      .eq("id", input.id)
+      .maybeSingle();
+
+    if (existing && existing.owner_id === user.id) {
+      const { error: updateErr } = await supabase
+        .from("models")
+        .update({
+          name: input.title,
+          title: input.title,
+          description: input.description,
+          category: input.category,
+          category_id: categoryId,
+          license_type: input.licenseType || "standard",
+          license_id: licenseId,
+          price: Number(input.price || 0),
+          preview_image_paths: input.previewImagePaths ?? [],
+          thumbnail_url: input.thumbnailUrl || (input.previewImagePaths?.[0] ?? null),
+          storage_path: primaryFilePath,
+          file_path: primaryFilePath,
+          status: finalStatus,
+          published_at: finalStatus === "published" ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", input.id);
+
+      if (updateErr) {
+        console.error("Failed to update model:", updateErr);
+        return { success: false, error: updateErr.message };
+      }
+
+      await syncModelChildren(supabase, input.id, user.id, input);
+      return { success: true, data: { id: input.id } };
+    }
+  }
+
+  // Insert new model
   const { data, error } = await supabase
     .from("models")
     .insert({
@@ -129,26 +225,159 @@ export async function publishCreatorModelListing(
       seller_user_id: user.id,
       name: input.title,
       title: input.title,
+      slug: uniqueSlug,
       description: input.description,
       category: input.category,
+      category_id: categoryId,
       license_type: input.licenseType || "standard",
+      license_id: licenseId,
       price: Number(input.price || 0),
+      currency: "INR",
       preview_image_paths: input.previewImagePaths ?? [],
       thumbnail_url: input.thumbnailUrl || (input.previewImagePaths?.[0] ?? null),
-      storage_path: input.filePath || "models/placeholder.stl",
-      file_path: input.filePath || "models/placeholder.stl",
-      status: input.status || "published",
+      storage_path: primaryFilePath,
+      file_path: primaryFilePath,
+      status: finalStatus,
+      published_at: finalStatus === "published" ? new Date().toISOString() : null,
       credits_spent: 0,
     })
     .select("id")
     .single();
 
-  if (error) {
-    console.error("Failed to publish creator model:", error);
-    return { success: false, error: error.message };
+  if (error || !data) {
+    console.error("Failed to insert creator model:", error);
+    return { success: false, error: error?.message || "Failed to create model record" };
   }
 
+  await syncModelChildren(supabase, data.id, user.id, input);
   return { success: true, data: { id: data.id } };
+}
+
+/**
+ * Saves a partial model upload as a draft.
+ * Allows creators to pause their work and resume later.
+ */
+export async function saveModelDraft(
+  input: Partial<CreatorModelInput>
+): Promise<{ success: boolean; data?: { id: string }; error?: string }> {
+  return publishCreatorModelListing({
+    title: input.title || "Untitled Draft",
+    description: input.description || "",
+    category: input.category || "Mechanical",
+    subcategory: input.subcategory,
+    tags: input.tags,
+    price: input.price || 0,
+    licenseType: input.licenseType || "standard",
+    dimensions: input.dimensions,
+    materials: input.materials,
+    printInfo: input.printInfo,
+    filePath: input.filePath,
+    files: input.files,
+    previewImagePaths: input.previewImagePaths,
+    thumbnailUrl: input.thumbnailUrl,
+    status: "draft",
+    id: input.id,
+  });
+}
+
+/**
+ * Synchronizes model files, preview images, tags, and initial version for a model.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function syncModelChildren(supabase: any, modelId: string, userId: string, input: CreatorModelInput) {
+  try {
+    // 1. Model Files
+    if (input.files && input.files.length > 0) {
+      // Remove old file records for this model
+      await supabase.from("model_files").delete().eq("model_id", modelId);
+
+      const fileRows = input.files.map((f, idx) => ({
+        model_id: modelId,
+        filename: f.filename,
+        storage_path: f.storagePath,
+        format: f.format.toUpperCase(),
+        file_size: f.fileSize || 0,
+        is_primary: f.isPrimary ?? (idx === 0),
+        is_downloadable: true,
+      }));
+
+      await supabase.from("model_files").insert(fileRows);
+    }
+
+    // 2. Model Images
+    if (input.previewImagePaths && input.previewImagePaths.length > 0) {
+      await supabase.from("model_images").delete().eq("model_id", modelId);
+
+      const imageRows = input.previewImagePaths.map((path, idx) => ({
+        model_id: modelId,
+        storage_path: path,
+        sort_order: idx,
+        is_cover: idx === 0,
+      }));
+
+      await supabase.from("model_images").insert(imageRows);
+    }
+
+    // 3. Normalized Tags
+    if (input.tags && input.tags.length > 0) {
+      for (const rawTag of input.tags) {
+        const tagName = rawTag.trim().toLowerCase();
+        if (!tagName) continue;
+        const tagSlug = slugify(tagName);
+
+        // Upsert tag
+        const { data: tagRecord } = await supabase
+          .from("tags")
+          .upsert({ name: tagName, slug: tagSlug }, { onConflict: "slug" })
+          .select("id")
+          .single();
+
+        if (tagRecord?.id) {
+          await supabase
+            .from("model_tags")
+            .upsert({ model_id: modelId, tag_id: tagRecord.id }, { onConflict: "model_id,tag_id" });
+        }
+      }
+    }
+
+    // 4. Initial Model Version if none exists
+    const { data: versions } = await supabase
+      .from("model_versions")
+      .select("id")
+      .eq("model_id", modelId)
+      .limit(1);
+
+    if (!versions || versions.length === 0) {
+      await supabase.from("model_versions").insert({
+        model_id: modelId,
+        version_number: "1.0.0",
+        changelog: "Initial submission",
+        created_by: userId,
+        is_current: true,
+      });
+    }
+
+    // 5. Record model event
+    let eventType = "draft_saved";
+    if (input.status === "published") {
+      eventType = "published";
+    } else if (input.status === "pending_review" || input.status === "under_review") {
+      eventType = "submitted_for_review";
+    }
+
+    await supabase.from("model_events").insert({
+      model_id: modelId,
+      user_id: userId,
+      event_type: eventType,
+      metadata: {
+        title: input.title,
+        status: input.status,
+        file_count: input.files?.length ?? 1,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to sync model children:", err);
+  }
 }
 
 /**

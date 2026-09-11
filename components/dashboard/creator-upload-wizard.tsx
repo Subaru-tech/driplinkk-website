@@ -21,7 +21,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { CATEGORY_LIST, PRINT_MATERIALS } from "@/lib/marketplace";
-import { publishCreatorModelListing } from "@/driplink-web-backend/actions/upload";
+import { publishCreatorModelListing, saveModelDraft } from "@/driplink-web-backend/actions/upload";
 
 export type UploadStep = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -39,6 +39,8 @@ export function CreatorUploadWizard() {
 
   const [step, setStep] = useState<UploadStep>(1);
   const [publishing, setPublishing] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<"draft" | "pending_review" | "published">("pending_review");
   const [createdModelId, setCreatedModelId] = useState<string | null>(null);
 
   // Step 1: Upload Files
@@ -142,10 +144,61 @@ export function CreatorUploadWizard() {
     }
   }
 
-  async function handlePublish() {
+  async function handleSaveDraft() {
+    setSavingDraft(true);
+    try {
+      const res = await saveModelDraft({
+        id: createdModelId || undefined,
+        title: title || "Untitled Draft",
+        description: description || "",
+        category: category || "Mechanical",
+        subcategory,
+        tags,
+        price: pricingType === "free" ? 0 : Number(price) || 0,
+        licenseType,
+        dimensions: {
+          x: Number(dimX) || 0,
+          y: Number(dimY) || 0,
+          z: Number(dimZ) || 0,
+        },
+        materials: selectedMaterials,
+        printInfo: {
+          layerHeight,
+          infill,
+          supports,
+          printTime,
+          assemblyNotes,
+        },
+        filePath: files[0] ? `models/${files[0].name}` : undefined,
+        files: files.map((f, i) => ({
+          filename: f.name,
+          storagePath: `models/${f.name}`,
+          format: f.extension,
+          isPrimary: i === 0,
+        })),
+        previewImagePaths: previewImages,
+        thumbnailUrl: previewImages[0] || null,
+      });
+
+      setSavingDraft(false);
+      if (res.success) {
+        if (res.data?.id) setCreatedModelId(res.data.id);
+        toast("success", "Draft saved! Accessible anytime from Creator Studio.");
+      } else {
+        toast("error", res.error || "Failed to save draft.");
+      }
+    } catch {
+      setSavingDraft(false);
+      toast("error", "An unexpected error occurred while saving draft.");
+    }
+  }
+
+  async function handleSubmit(status: "pending_review" | "published" = "pending_review") {
     setPublishing(true);
+    setSubmissionStatus(status);
     try {
       const res = await publishCreatorModelListing({
+        id: createdModelId || undefined,
         title,
         description,
         category,
@@ -167,24 +220,34 @@ export function CreatorUploadWizard() {
           assemblyNotes,
         },
         filePath: `models/${files[0]?.name || "model.stl"}`,
+        files: files.map((f, i) => ({
+          filename: f.name,
+          storagePath: `models/${f.name}`,
+          format: f.extension,
+          isPrimary: i === 0,
+        })),
         previewImagePaths: previewImages,
         thumbnailUrl: previewImages[0] || null,
-        status: "published",
+        status,
       });
 
       setPublishing(false);
 
       if (!res.success) {
-        toast("error", res.error || "Failed to publish listing.");
+        toast("error", res.error || "Failed to submit model.");
         return;
       }
 
       setCreatedModelId(res.data?.id || null);
       setStep(6);
-      toast("success", "Model published successfully to the marketplace!");
+      if (status === "published") {
+        toast("success", "Model published directly to the marketplace!");
+      } else {
+        toast("success", "Model submitted for review! Admins will inspect your design.");
+      }
     } catch {
       setPublishing(false);
-      toast("error", "An unexpected error occurred while publishing.");
+      toast("error", "An unexpected error occurred while submitting.");
     }
   }
 
@@ -337,7 +400,15 @@ export function CreatorUploadWizard() {
             </div>
           </div>
 
-          <div className="flex justify-end pt-4 border-t border-line">
+          <div className="flex items-center justify-between pt-4 border-t border-line">
+            <Button
+              variant="secondary"
+              loading={savingDraft}
+              onClick={handleSaveDraft}
+              className="text-xs"
+            >
+              Save as Draft
+            </Button>
             <Button
               size="lg"
               disabled={!canAdvance(1)}
@@ -526,9 +597,19 @@ export function CreatorUploadWizard() {
           </div>
 
           <div className="flex items-center justify-between pt-4 border-t border-line">
-            <Button variant="secondary" onClick={() => setStep(1)}>
-              Back
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" onClick={() => setStep(1)}>
+                Back
+              </Button>
+              <Button
+                variant="secondary"
+                loading={savingDraft}
+                onClick={handleSaveDraft}
+                className="text-xs"
+              >
+                Save Draft
+              </Button>
+            </div>
             <Button
               size="lg"
               disabled={!canAdvance(2)}
@@ -700,9 +781,19 @@ export function CreatorUploadWizard() {
           </div>
 
           <div className="flex items-center justify-between pt-4 border-t border-line">
-            <Button variant="secondary" onClick={() => setStep(2)}>
-              Back
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" onClick={() => setStep(2)}>
+                Back
+              </Button>
+              <Button
+                variant="secondary"
+                loading={savingDraft}
+                onClick={handleSaveDraft}
+                className="text-xs"
+              >
+                Save Draft
+              </Button>
+            </div>
             <Button
               size="lg"
               disabled={!canAdvance(3)}
@@ -855,9 +946,19 @@ export function CreatorUploadWizard() {
           </div>
 
           <div className="flex items-center justify-between pt-4 border-t border-line">
-            <Button variant="secondary" onClick={() => setStep(3)}>
-              Back
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" onClick={() => setStep(3)}>
+                Back
+              </Button>
+              <Button
+                variant="secondary"
+                loading={savingDraft}
+                onClick={handleSaveDraft}
+                className="text-xs"
+              >
+                Save Draft
+              </Button>
+            </div>
             <Button
               size="lg"
               disabled={!canAdvance(4)}
@@ -1022,19 +1123,44 @@ export function CreatorUploadWizard() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-4 border-t border-line">
-            <Button variant="secondary" onClick={() => setStep(4)}>
-              Back
-            </Button>
-            <Button
-              size="lg"
-              loading={publishing}
-              onClick={handlePublish}
-              className="gap-2 bg-accent text-accent-contrast font-bold hover:bg-accent-hover"
-            >
-              <Sparkles className="size-4" />
-              <span>Publish Model to Marketplace</span>
-            </Button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-line">
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" onClick={() => setStep(4)}>
+                Back
+              </Button>
+              <Button
+                variant="secondary"
+                loading={savingDraft}
+                onClick={handleSaveDraft}
+                className="text-xs"
+              >
+                Save Draft
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                size="lg"
+                loading={publishing && submissionStatus === "pending_review"}
+                disabled={publishing}
+                onClick={() => handleSubmit("pending_review")}
+                className="gap-2 bg-raised border border-line text-fg font-bold hover:bg-raised/80"
+              >
+                <CheckCircle2 className="size-4 text-accent" />
+                <span>Submit for Review</span>
+              </Button>
+
+              <Button
+                size="lg"
+                loading={publishing && submissionStatus === "published"}
+                disabled={publishing}
+                onClick={() => handleSubmit("published")}
+                className="gap-2 bg-accent text-accent-contrast font-bold hover:bg-accent-hover"
+              >
+                <Sparkles className="size-4" />
+                <span>Publish Now</span>
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -1048,13 +1174,21 @@ export function CreatorUploadWizard() {
 
           <div className="flex flex-col gap-2 max-w-md">
             <span className="font-mono text-xs uppercase font-bold tracking-wider text-accent">
-              Model Published 🎉
+              {submissionStatus === "pending_review" ? "Submitted for Review 🚀" : "Model Published 🎉"}
             </span>
             <h2 className="font-display text-3xl font-bold tracking-tight text-fg">
-              Congratulations!
+              {submissionStatus === "pending_review" ? "Under Review" : "Congratulations!"}
             </h2>
             <p className="text-sm text-muted leading-relaxed">
-              <strong className="text-fg font-semibold">{title}</strong> is now live in the DripLink 3D Model Marketplace and synced with LeaFF OS.
+              {submissionStatus === "pending_review" ? (
+                <>
+                  <strong className="text-fg font-semibold">{title}</strong> has been submitted for review. Once verified by an admin, it will be published to the /models marketplace.
+                </>
+              ) : (
+                <>
+                  <strong className="text-fg font-semibold">{title}</strong> is now live in the DripLink 3D Model Marketplace and synced with LeaFF OS.
+                </>
+              )}
             </p>
           </div>
 
