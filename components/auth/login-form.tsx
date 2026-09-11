@@ -17,7 +17,9 @@ function ClerkLoginForm({ initialError }: { initialError: string | null }) {
   const { signIn, fetchStatus } = useSignIn();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [verificationCode, setVerificationCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string; code?: string }>({});
   const [formError, setFormError] = useState<string | null>(initialError);
   const [pending, setPending] = useState(false);
 
@@ -60,6 +62,57 @@ function ClerkLoginForm({ initialError }: { initialError: string | null }) {
         return;
       }
 
+      if (signIn.status === "needs_second_factor" || signIn.status === "needs_client_trust") {
+        const { error: sendErr } = await signIn.mfa.sendEmailCode();
+        if (sendErr) {
+          setPending(false);
+          setFormError(sendErr.message || "Failed to send verification code.");
+          return;
+        }
+        setVerifying(true);
+        setPending(false);
+        return;
+      }
+
+      if (signIn.status === "complete") {
+        await signIn.finalize({
+          navigate: async ({ decorateUrl }) => {
+            const home = await resolveHome();
+            const target = decorateUrl ? decorateUrl(home) : home;
+            window.location.href = target;
+          },
+        });
+      } else {
+        setPending(false);
+        setFormError(`Sign-in requires additional verification (${signIn.status}).`);
+      }
+    } catch (err: unknown) {
+      setPending(false);
+      setFormError(err instanceof Error ? err.message : "Failed to sign in.");
+    }
+  }
+
+  async function onVerifyCode(event: FormEvent) {
+    event.preventDefault();
+    setFormError(null);
+    if (!verificationCode.trim()) {
+      setErrors((e) => ({ ...e, code: "Enter the code sent to your email." }));
+      return;
+    }
+
+    if (!signIn) return;
+    setPending(true);
+    try {
+      const { error } = await signIn.mfa.verifyEmailCode({
+        code: verificationCode.trim(),
+      });
+
+      if (error) {
+        setPending(false);
+        setFormError(error.message || "Invalid verification code.");
+        return;
+      }
+
       await signIn.finalize({
         navigate: async ({ decorateUrl }) => {
           const home = await resolveHome();
@@ -69,11 +122,44 @@ function ClerkLoginForm({ initialError }: { initialError: string | null }) {
       });
     } catch (err: unknown) {
       setPending(false);
-      setFormError(err instanceof Error ? err.message : "Failed to sign in.");
+      setFormError(err instanceof Error ? err.message : "Verification failed.");
     }
   }
 
   const isSubmitting = pending || fetchStatus === "fetching";
+
+  if (verifying) {
+    return (
+      <AuthCard
+        title="Verify your login"
+        subtitle={`We sent a verification code to ${email}. Enter it below to verify your device.`}
+        error={formError}
+        footer={{ prompt: "Use another account?", href: "/login", label: "Back to login" }}
+      >
+        <form onSubmit={onVerifyCode} noValidate className="flex flex-col gap-5">
+          <Field label="Verification Code" error={errors.code}>
+            {({ id, describedBy, invalid }) => (
+              <Input
+                id={id}
+                name="code"
+                type="text"
+                autoComplete="one-time-code"
+                placeholder="6-digit code"
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value)}
+                aria-describedby={describedBy}
+                invalid={invalid}
+              />
+            )}
+          </Field>
+
+          <Button type="submit" size="lg" loading={isSubmitting} className="w-full">
+            Complete Verification
+          </Button>
+        </form>
+      </AuthCard>
+    );
+  }
 
   return (
     <AuthCard
