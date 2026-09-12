@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getUnifiedUser } from "@/driplink-web-backend/auth/clerk";
 import { getSupabaseServerClient, getSupabaseServiceClient } from "@/driplink-web-backend/db/client";
+import { generateB2PresignedDownloadUrl } from "@/lib/b2-client";
 
 export type ClaimResult = {
   success: boolean;
@@ -148,29 +149,10 @@ export async function getModelDownloadUrl(
   }
 
   try {
-    // 1. Verify user acquired this model or owns it (privileged check)
-    let hasAccess = false;
-    const { data: rpcAccess, error: rpcAccessErr } = await serviceSupabase.rpc(
-      "can_user_access_model_file",
-      { p_user_id: user.id, p_model_id: modelId }
-    );
-
-    if (!rpcAccessErr && typeof rpcAccess === "boolean") {
-      hasAccess = rpcAccess;
-    } else {
-      const { data: acquisition } = await supabase
-        .from("model_acquisitions")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("model_id", modelId)
-        .maybeSingle();
-
-      hasAccess = Boolean(acquisition);
-    }
-
+    // 1. Query model to verify existence and check published status
     const { data: model, error: modelErr } = await supabase
       .from("models")
-      .select("id, file_path, title, seller_user_id, owner_id")
+      .select("id, file_path, title, seller_user_id, owner_id, status")
       .eq("id", modelId)
       .maybeSingle();
 
@@ -178,9 +160,18 @@ export async function getModelDownloadUrl(
       return { success: false, error: "Model file not found." };
     }
 
-    const isOwner = model.seller_user_id === user.id || model.owner_id === user.id;
+    // MANDATORY PUBLISHED GATE: Unpublished models (draft/in_review) cannot be downloaded
+    if (model.status !== "published") {
+      return { success: false, error: "This model is not published and cannot be downloaded." };
+    }
 
-    if (!hasAccess && !isOwner) {
+    // 2. Verify user acquired this model or owns it (privileged check)
+    const { data: hasAccess, error: rpcAccessErr } = await serviceSupabase.rpc(
+      "can_user_access_model_file",
+      { p_user_id: user.id, p_model_id: modelId, p_file_id: fileId || null }
+    );
+
+    if (rpcAccessErr || !hasAccess) {
       return { success: false, error: "You must add this model to your library first." };
     }
 
@@ -216,19 +207,10 @@ export async function getModelDownloadUrl(
       return { success: false, error: "No download file is associated with this model." };
     }
 
-    // 2. Generate signed URL (valid for 1 hour)
-    const { data: signData, error: signErr } = await supabase.storage
-      .from("model-files")
-      .createSignedUrl(targetPath, 3600, {
-        download: true,
-      });
+    // 3. Generate short-lived (15 min) presigned GET URL directly against Backblaze B2 S3 endpoint
+    const downloadUrl = await generateB2PresignedDownloadUrl(targetPath, 900);
 
-    if (signErr || !signData?.signedUrl) {
-      console.error("Failed to generate signed URL:", signErr);
-      return { success: false, error: "Failed to generate download link." };
-    }
-
-    // 3. Log download event in model_events
+    // 4. Log download event in model_events
     try {
       await serviceSupabase
         .from("model_events")
@@ -236,13 +218,13 @@ export async function getModelDownloadUrl(
           model_id: modelId,
           user_id: user.id,
           event_type: "download",
-          metadata: { file_id: fileId || "primary", path: targetPath },
+          metadata: { file_id: fileId || "primary", path: targetPath, provider: "backblaze-b2" },
         });
     } catch {
       // Non-blocking telemetry
     }
 
-    return { success: true, downloadUrl: signData.signedUrl };
+    return { success: true, downloadUrl };
   } catch (err) {
     console.error("getModelDownloadUrl exception:", err);
     return {

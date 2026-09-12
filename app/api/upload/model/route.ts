@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getUnifiedUser } from "@/driplink-web-backend/auth/clerk";
 import { getSupabaseServiceClient } from "@/driplink-web-backend/db/client";
+import { uploadModelToB2 } from "@/lib/b2-client";
 
 // Allowlist of safe 3D model formats
 export const ALLOWED_MODEL_EXTENSIONS = [".stl", ".step", ".stp", ".3mf", ".obj"];
@@ -209,40 +210,28 @@ export async function POST(req: Request) {
       }
     }
 
-    // 5. File is verified safe — persist to model-files bucket via service client
-    const supabase = getSupabaseServiceClient();
-    if (!supabase) {
-      return NextResponse.json(
-        { success: false, error: "Storage backend unavailable." },
-        { status: 500 }
-      );
-    }
-
+    // 5. File is verified safe — persist to Backblaze B2 (S3-compatible) storage bucket
     const cleanStem = filename.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 40);
     const storagePath = `${user.id}/${Date.now()}-${cleanStem}${ext}`;
+    const contentType = file.type || "application/octet-stream";
 
-    const { data: uploadData, error: uploadErr } = await supabase.storage
-      .from("model-files")
-      .upload(storagePath, buffer, {
-        contentType: file.type || "application/octet-stream",
-        upsert: false,
-      });
-
-    if (uploadErr) {
-      console.error("Storage upload error:", uploadErr);
+    const b2Upload = await uploadModelToB2(storagePath, buffer, contentType);
+    if (!b2Upload.success) {
+      console.error("Backblaze B2 storage upload error:", b2Upload.error);
       return NextResponse.json(
-        { success: false, error: uploadErr.message || "Failed to store file." },
+        { success: false, error: b2Upload.error || "Failed to store file in Backblaze B2." },
         { status: 500 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      storagePath: uploadData.path,
+      storagePath, // Relative object key stored in database
       filename,
       format: ext.replace(".", ""),
       fileSize: file.size,
       moderationStatus: "in_review",
+      storageProvider: "backblaze-b2",
     });
   } catch (err) {
     console.error("Upload handler error:", err);

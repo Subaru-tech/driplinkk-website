@@ -3,6 +3,7 @@
 import { getUnifiedUser } from "@/driplink-web-backend/auth/clerk";
 import { getSupabaseServerClient, getSupabaseServiceClient } from "@/driplink-web-backend/db/client";
 import { SUPABASE_ANON_KEY } from "@/lib/supabase";
+import { deleteB2Object } from "@/lib/b2-client";
 
 export type UploadSession = {
   userId: string;
@@ -72,6 +73,8 @@ export async function recordUploadedModel({
       owner_id: user.id,
       name,
       storage_path: storagePath,
+      file_path: storagePath,
+      storage_provider: "backblaze-b2",
       thumbnail_url: thumbnailUrl || null,
       credits_spent: 0,
     })
@@ -203,6 +206,7 @@ export async function publishCreatorModelListing(
           thumbnail_url: input.thumbnailUrl || (input.previewImagePaths?.[0] ?? null),
           storage_path: primaryFilePath,
           file_path: primaryFilePath,
+          storage_provider: "backblaze-b2",
           status: finalStatus,
           published_at: null,
           updated_at: new Date().toISOString(),
@@ -240,6 +244,7 @@ export async function publishCreatorModelListing(
       thumbnail_url: input.thumbnailUrl || (input.previewImagePaths?.[0] ?? null),
       storage_path: primaryFilePath,
       file_path: primaryFilePath,
+      storage_provider: "backblaze-b2",
       status: finalStatus,
       published_at: null,
       credits_spent: 0,
@@ -503,9 +508,10 @@ export async function deleteUploadedModel(id: string): Promise<{ success: boolea
     return { success: false, error: "Model not found or not owned by you." };
   }
 
-  // 2. Remove file from storage
+  // 2. Remove file from storage (both B2 and legacy Supabase Storage)
   if (model.storage_path) {
-    await supabase.storage.from("model-files").remove([model.storage_path]);
+    await deleteB2Object(model.storage_path).catch(() => {});
+    await supabase.storage.from("model-files").remove([model.storage_path]).catch(() => {});
   }
 
   // 3. Delete database row
