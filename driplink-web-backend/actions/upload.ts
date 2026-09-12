@@ -174,7 +174,9 @@ export async function publishCreatorModelListing(
 
   const baseSlug = slugify(input.title || "untitled-model");
   const uniqueSlug = `${baseSlug}-${Date.now().toString(36)}`;
-  const finalStatus = input.status || "pending_review";
+  // Mandatory moderation gate: submissions from creators must go through review (status 'in_review')
+  // Creators are never permitted to publish directly without admin approval.
+  const finalStatus = input.status === "draft" ? "draft" : "in_review";
   const primaryFilePath = input.filePath || input.files?.[0]?.storagePath || "models/placeholder.stl";
 
   // Check if updating existing draft
@@ -202,10 +204,11 @@ export async function publishCreatorModelListing(
           storage_path: primaryFilePath,
           file_path: primaryFilePath,
           status: finalStatus,
-          published_at: finalStatus === "published" ? new Date().toISOString() : null,
+          published_at: null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", input.id);
+
 
       if (updateErr) {
         console.error("Failed to update model:", updateErr);
@@ -238,7 +241,7 @@ export async function publishCreatorModelListing(
       storage_path: primaryFilePath,
       file_path: primaryFilePath,
       status: finalStatus,
-      published_at: finalStatus === "published" ? new Date().toISOString() : null,
+      published_at: null,
       credits_spent: 0,
     })
     .select("id")

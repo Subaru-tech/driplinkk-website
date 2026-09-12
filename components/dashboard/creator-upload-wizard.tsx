@@ -1137,28 +1137,16 @@ export function CreatorUploadWizard() {
                 Save Draft
               </Button>
             </div>
-
             <div className="flex items-center gap-2">
               <Button
                 size="lg"
-                loading={publishing && submissionStatus === "pending_review"}
+                loading={publishing}
                 disabled={publishing}
-                onClick={() => handleSubmit("pending_review")}
-                className="gap-2 bg-raised border border-line text-fg font-bold hover:bg-raised/80"
-              >
-                <CheckCircle2 className="size-4 text-accent" />
-                <span>Submit for Review</span>
-              </Button>
-
-              <Button
-                size="lg"
-                loading={publishing && submissionStatus === "published"}
-                disabled={publishing}
-                onClick={() => handleSubmit("published")}
+                onClick={() => handleSubmit("in_review" as any)}
                 className="gap-2 bg-accent text-accent-contrast font-bold hover:bg-accent-hover"
               >
-                <Sparkles className="size-4" />
-                <span>Publish Now</span>
+                <CheckCircle2 className="size-4 text-accent-contrast" />
+                <span>Submit for Moderation Review</span>
               </Button>
             </div>
           </div>

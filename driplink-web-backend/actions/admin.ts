@@ -173,3 +173,42 @@ export async function updateMartOrderAdmin({
   revalidatePath(`/dashboard/mart-orders/${orderId}`);
   return { success: true };
 }
+
+/**
+ * Approves or rejects a vendor or freelancer provider application.
+ * Calls public.admin_review_provider PostgreSQL RPC through ensureAdmin().
+ */
+export async function updateProviderStatusAdmin({
+  providerId,
+  status,
+  notes,
+}: {
+  providerId: string;
+  status: "approved" | "rejected" | "pending";
+  notes?: string;
+}): Promise<AdminActionResult> {
+  const guard = await ensureAdmin();
+  if (!guard.ok) {
+    return { success: false, error: guard.error };
+  }
+
+  const { error: rpcErr } = await guard.client.rpc("admin_review_provider", {
+    p_provider_id: providerId,
+    p_status: status,
+    p_notes: notes || null,
+  });
+
+  if (rpcErr) {
+    console.error("Failed to review provider via RPC:", rpcErr);
+    return { success: false, error: rpcErr.message || "Failed to update provider status." };
+  }
+
+  revalidatePath("/admin/listings");
+  revalidatePath("/admin");
+  revalidatePath("/freelance");
+  revalidatePath("/vendor/apply");
+  revalidatePath("/dashboard/vendor");
+  revalidatePath("/dashboard/freelancer");
+  return { success: true };
+}
+

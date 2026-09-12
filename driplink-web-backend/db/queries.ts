@@ -697,6 +697,59 @@ export async function getAdminPendingModels(): Promise<QueryResult<AdminPendingM
   return { data: models, backendReady: true };
 }
 
+export type AdminPendingProvider = {
+  provider_id: string;
+  user_id: string;
+  type: "vendor" | "freelancer";
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+  applicant_name: string;
+  applicant_email: string;
+  details: {
+    business_name?: string;
+    location?: string;
+    materials_supported?: string[];
+    capacity_notes?: string;
+    display_name?: string;
+    bio?: string;
+    skills?: string[];
+    portfolio_urls?: string[];
+    rate_type?: string;
+    base_rate?: number;
+    profile_status?: string;
+  };
+};
+
+export async function getAdminPendingProviders(typeFilter?: string): Promise<QueryResult<AdminPendingProvider[]>> {
+  const serviceSupabase = getSupabaseServiceClient();
+  const supabase = await getSupabaseServerClient();
+  const client = serviceSupabase ?? supabase;
+  if (!client) return empty([]);
+
+  const { data, error } = await client.rpc("admin_get_pending_providers", {
+    p_type: typeFilter || null,
+  });
+
+  if (error) {
+    console.error("getAdminPendingProviders error:", error);
+    return empty([]);
+  }
+
+  const providers: AdminPendingProvider[] = ((data as Array<Record<string, unknown>>) ?? []).map((row) => ({
+    provider_id: String(row.provider_id),
+    user_id: String(row.user_id),
+    type: row.type as "vendor" | "freelancer",
+    status: row.status as "pending" | "approved" | "rejected",
+    created_at: String(row.created_at),
+    applicant_name: String(row.applicant_name || "Applicant"),
+    applicant_email: String(row.applicant_email || "No email"),
+    details: (row.details as AdminPendingProvider["details"]) || {},
+  }));
+
+  return { data: providers, backendReady: true };
+}
+
+
 export type AdminMartOrder = MartOrder & {
   assigned_vendor: string | null;
   vendor_notes: string | null;

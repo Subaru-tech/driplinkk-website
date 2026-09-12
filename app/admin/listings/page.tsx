@@ -1,24 +1,28 @@
-import { Box, Package } from "lucide-react";
+import { Box, Briefcase, Factory, Package, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import { ListingReviewActions } from "@/components/admin/listing-actions";
 import { ModelReviewActions } from "@/components/admin/model-actions";
+import { ProviderReviewActions } from "@/components/admin/provider-actions";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusPill } from "@/components/ui/status-pill";
-import { getAdminPendingListings, getAdminPendingModels } from "@/driplink-web-backend";
+import { getAdminPendingListings, getAdminPendingModels, getAdminPendingProviders } from "@/driplink-web-backend";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Admin — Pending Reviews | DripLink" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminListingsPage() {
-  const [{ data: listings }, { data: models }] = await Promise.all([
+  const [{ data: listings }, { data: models }, { data: providers }] = await Promise.all([
     getAdminPendingListings(),
     getAdminPendingModels(),
+    getAdminPendingProviders(),
   ]);
 
-  const totalPending = listings.length + models.length;
+  const pendingProvidersCount = providers.filter((p) => p.status === "pending").length;
+  const totalPending = listings.length + models.length + pendingProvidersCount;
+
 
   return (
     <div className="flex flex-col gap-8">
@@ -37,7 +41,121 @@ export default async function AdminListingsPage() {
         </StatusPill>
       </div>
 
+      {/* SECTION 0: Vendors & Freelancers Pending Approval */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users className="size-4 text-accent" />
+            <h3 className="font-display text-base font-semibold text-fg">
+              Vendors & Freelancers ({providers.length})
+            </h3>
+          </div>
+          <span className="text-xs text-muted">Providers entering Mart manufacturing & Freelance directories</span>
+        </div>
+
+        {providers.length === 0 ? (
+          <Card>
+            <EmptyState
+              icon={Users}
+              size="sm"
+              message="No vendor or freelancer applications currently waiting for review."
+            />
+          </Card>
+        ) : (
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-line bg-raised/40 font-semibold uppercase tracking-wider text-faint text-[10px]">
+                    <th scope="col" className="px-4 py-3">Applicant / Business</th>
+                    <th scope="col" className="px-4 py-3">Type</th>
+                    <th scope="col" className="px-4 py-3">Key Details</th>
+                    <th scope="col" className="px-4 py-3">Status</th>
+                    <th scope="col" className="px-4 py-3">Applied</th>
+                    <th scope="col" className="px-4 py-3 text-right">Review</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line/60">
+                  {providers.map((p) => {
+                    const isVendor = p.type === "vendor";
+                    const title = isVendor
+                      ? p.details.business_name || p.applicant_name
+                      : p.details.display_name || p.applicant_name;
+
+                    return (
+                      <tr key={p.provider_id} className="hover:bg-raised/30 transition-colors">
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <div className="grid size-9 place-items-center rounded-lg border border-line bg-raised text-muted">
+                              {isVendor ? <Factory className="size-4 text-accent" /> : <Briefcase className="size-4 text-accent" />}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-fg">{title}</p>
+                              <p className="truncate font-mono text-[11px] text-muted">{p.applicant_email}</p>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3.5">
+                          <span className="rounded bg-surface px-2 py-0.5 text-[11px] font-medium border border-line uppercase">
+                            {p.type}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-3.5 text-muted max-w-xs truncate">
+                          {isVendor ? (
+                            <span>
+                              {p.details.location ? `${p.details.location} • ` : ""}
+                              {p.details.materials_supported?.length
+                                ? p.details.materials_supported.join(", ").toUpperCase()
+                                : "Standard Materials"}
+                            </span>
+                          ) : (
+                            <span>
+                              {p.details.rate_type === "hourly"
+                                ? `${formatCurrency(p.details.base_rate || 0)}/hr`
+                                : `Fixed from ${formatCurrency(p.details.base_rate || 0)}`}
+                              {p.details.skills?.length ? ` • ${p.details.skills.slice(0, 3).join(", ")}` : ""}
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3.5">
+                          <StatusPill
+                            tone={
+                              p.status === "approved"
+                                ? "accent"
+                                : p.status === "rejected"
+                                ? "danger"
+                                : "warning"
+                            }
+                          >
+                            {p.status}
+                          </StatusPill>
+                        </td>
+
+                        <td className="px-4 py-3.5 text-muted">
+                          {formatDate(p.created_at)}
+                        </td>
+
+                        <td className="px-4 py-3.5 text-right">
+                          <ProviderReviewActions
+                            providerId={p.provider_id}
+                            providerType={p.type}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+      </div>
+
       {/* SECTION 1: 3D CAD Models Pending Review */}
+
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
